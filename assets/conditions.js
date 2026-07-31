@@ -41,7 +41,8 @@ const WMO={0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48
   80:"Showers",81:"Showers",82:"Heavy showers",95:"T-storm",96:"T-storm",99:"T-storm"};
 const RANK={good:0,fair:1,poor:2,storm:3};
 function uvCat(u){ if(u==null)return""; if(u<3)return"Low"; if(u<6)return"Moderate"; if(u<8)return"High"; if(u<11)return"Very high"; return"Extreme"; }
-function uvSpf(u){ if(u==null)return""; if(u<3)return"Minimal — sunscreen optional"; if(u<6)return"SPF 30, hat"; if(u<8)return"SPF 30+, reapply every 2h"; if(u<11)return"SPF 50, shade midday"; return"SPF 50+, avoid midday sun"; }
+function uvProtect(u){ if(u==null)return""; if(u<3)return"Low — sunscreen optional"; if(u<6)return"Hat, SPF 30, sunglasses"; if(u<8)return"SPF 30+, hat, sunglasses — reapply every 2h"; if(u<11)return"SPF 50, hat, shade/umbrella — cover up, avoid 10–4"; return"SPF 50+, umbrella, cover up — stay out of midday sun"; }
+function uvBurn(u){ if(u==null||u<1)return null; return Math.max(5,Math.round(80/u)); } // ~min to burn, unprotected fair skin
 function aqiCat(a){ if(a==null)return""; if(a<=50)return"Good"; if(a<=100)return"Moderate"; if(a<=150)return"Unhealthy (sensitive)"; if(a<=200)return"Unhealthy"; if(a<=300)return"Very unhealthy"; return"Hazardous"; }
 /* crew helpers */
 function coldWater(f){ if(f==null)return null;
@@ -68,7 +69,7 @@ const ACTS=[
     if(c.waveFt!=null){ if(c.waveFt>T.swimWavePoor){r=Math.max(r,2);w.push("big surf "+round(c.waveFt,1)+"ft");}
       else if(c.waveFt>T.swimWaveFair){r=Math.max(r,1);w.push("chop "+round(c.waveFt,1)+"ft");}}
     if(c.wq&&c.wq.lv==="fair"){r=Math.max(r,1);w.push("some runoff risk");}
-    if(c.uv!=null&&c.uv>=T.uvVery)w.push("UV "+round(c.uv)+" — sunscreen");
+    if(c.uv!=null&&c.uv>=T.uvHigh)w.push("UV "+round(c.uv)+" — cover up / reef-safe SPF");
     return{lv:lvFromRank(r),why:w.join(", ")||"Looks swimmable."};}},
 
  {key:"surf",label:"Surf",ico:"🏄",needs:s=>s.surf,score:(c)=>{
@@ -109,6 +110,14 @@ const ACTS=[
     if(c.waveFt!=null&&c.waveFt>2){r=Math.max(r,1);w.push("bumpy "+round(c.waveFt,1)+"ft");}
     return{lv:lvFromRank(r),why:w.join(", ")};}},
 
+ {key:"efoil",label:"eFoil",ico:"⚡",needs:s=>true,score:(c)=>{
+    if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms — off the water."};
+    let r=0,w=[];
+    if(c.windMph>20||c.gustMph>28||(c.waveFt!=null&&c.waveFt>4)){r=2;w.push("too rough "+round(c.windMph)+" g"+round(c.gustMph));}
+    else if(c.windMph>14||(c.waveFt!=null&&c.waveFt>3)){r=1;w.push("choppy "+round(c.windMph)+" mph — doable");}
+    else w.push("glassy — great foiling "+round(c.windMph)+" mph");
+    return{lv:lvFromRank(r),why:w.join(", ")};}},
+
  {key:"sail",label:"Sailing",ico:"⛵",needs:s=>true,score:(c)=>{
     if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms — no."};
     let r=0,w=[];
@@ -143,14 +152,14 @@ const ACTS=[
     if(c.windMph>28){r=Math.max(r,1);w.push("very windy");}
     return{lv:lvFromRank(r),why:w.join(", ")||"Pleasant for a walk."};}},
 
- {key:"beachday",label:"Beach / sunbathe",ico:"🏖️",needs:s=>true,score:(c)=>{
+ {key:"beachday",label:"Beach day",ico:"🏖️",needs:s=>true,score:(c)=>{
     if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms."};
     let r=0,w=[];
     if(c.precipProb!=null&&c.precipProb>50){r=2;w.push("rain "+round(c.precipProb)+"%");}
     else if(c.precipProb!=null&&c.precipProb>30){r=1;w.push("some clouds/rain risk");}
     if(c.airF!=null){ if(c.airF<58){r=Math.max(r,2);w.push("cool "+round(c.airF)+"°");}
       else if(c.airF<70){r=Math.max(r,1);w.push(round(c.airF)+"°");} else w.push("warm "+round(c.airF)+"°");}
-    if(c.uv!=null&&c.uv>=T.uvVery)w.push("UV "+round(c.uv)+" — "+uvSpf(c.uv));
+    if(c.uv!=null&&c.uv>=T.uvHigh){const b=uvBurn(c.uv);w.push("high UV "+round(c.uv)+(b?", burns in ~"+b+" min":"")+" — "+uvProtect(c.uv));}
     return{lv:lvFromRank(r),why:w.join(", ")};}},
 
  {key:"kite",label:"Fly a kite",ico:"🪁",needs:s=>true,score:(c)=>{
@@ -471,7 +480,9 @@ function renderCards(){
   cards.push(card("Wind",round(COND.windMph)+"<small> mph "+dir+"</small>","Gusts "+round(COND.gustMph)+" mph"));
   if(CFG.crew)cards.push(card("Visibility",COND.visMi!=null?(COND.visMi>=6?"Clear":COND.visMi.toFixed(1)+"<small> mi</small>"):"—",COND.visMi!=null&&COND.visMi<1?"⚠ fog — low visibility":"Fog/haze check"));
   if(COND.waveFt!=null)cards.push(card("Waves",round(COND.waveFt,1)+"<small> ft</small>",(COND.wavePeriod!=null?round(COND.wavePeriod)+"s swell":"")||"open-water est","est"));
-  cards.push(card("UV index",COND.uv!=null?round(COND.uv)+"<small> "+uvCat(COND.uv)+"</small>":"—",COND.uv!=null?uvSpf(COND.uv):""));
+  const uvB=uvBurn(COND.uv);
+  const uvMeta=COND.uv!=null?((uvB?"Burns in ~"+uvB+" min · ":"")+uvProtect(COND.uv)):"";
+  cards.push(card("UV index",COND.uv!=null?round(COND.uv)+"<small> "+uvCat(COND.uv)+"</small>":"—",uvMeta));
   cards.push(card("Air quality",COND.aqi!=null?round(COND.aqi)+"<small> AQI</small>":"—",COND.aqi!=null?aqiCat(COND.aqi):""));
   cards.push(card("Chance of rain",COND.precipProb!=null?round(COND.precipProb)+"<small>%</small>":"—","Next hour"));
   if(COND.tide&&COND.tide.next){const rising=COND.tide.state==="rising";
