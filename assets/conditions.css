@@ -5,10 +5,11 @@
 :root{
   --brand:#0b4f6c; --brand-2:#1b98c9;
   --bg:#f2f7fa; --card:#ffffff; --ink:#1b2a32; --muted:#5d7280; --line:#e2ecf2;
-  --good:#2e8b57; --fair:#c77f16; --poor:#c0392b; --storm:#7b241c;
+  --good:#1f7a49; --fair:#9a6410; --poor:#c0392b; --storm:#7b241c;
   --radius:14px; --shadow:0 1px 3px rgba(11,79,108,.08),0 6px 18px rgba(11,79,108,.06);
 }
 *{box-sizing:border-box} html,body{margin:0}
+html{scroll-behavior:smooth}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   background:var(--bg);color:var(--ink);line-height:1.4;-webkit-font-smoothing:antialiased}
 a{color:var(--brand-2)}
@@ -33,15 +34,23 @@ h1{font-size:1.3rem;margin:0;color:var(--brand);letter-spacing:.2px}
 .summary .headline{font-size:1.25rem;font-weight:800;line-height:1.15;margin:2px 0 7px}
 .summary .line{font-size:.93rem;opacity:.97;margin-top:4px}
 .summary .line b{font-weight:700}
-.lv-good{background:linear-gradient(135deg,#2e8b57,#227a4a)}
-.lv-fair{background:linear-gradient(135deg,#d98a1c,#b9720f)}
-.lv-poor{background:linear-gradient(135deg,#d0402f,#a5301f)}
+.lv-good{background:linear-gradient(135deg,#237a49,#19603a)}
+.lv-fair{background:linear-gradient(135deg,#9a6410,#7c4f00)}
+.lv-poor{background:linear-gradient(135deg,#bf3626,#93261a)}
 .lv-storm{background:linear-gradient(135deg,#7b241c,#591008)}
 
 .diag{display:none;background:#fff4f2;border:1px solid #f2c7bf;color:#8a2a1a;border-radius:10px;padding:10px 13px;font-size:.82rem;margin:10px 0}
 
-h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700}
+h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-margin-top:60px}
 .h2note{font-size:.8rem;color:var(--muted);margin:0 0 10px}
+
+/* sticky jump-nav */
+.secnav{position:sticky;top:0;z-index:30;display:flex;gap:6px;overflow-x:auto;background:var(--bg);
+  margin:6px -16px 4px;padding:8px 16px;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.secnav a{flex:0 0 auto;font-size:.77rem;font-weight:600;color:var(--muted);text-decoration:none;
+  padding:5px 11px;border-radius:16px;background:#e7f0f5;white-space:nowrap}
+.secnav a:hover,.secnav a:focus{color:#fff;background:var(--brand-2);outline:none}
+.strip:focus-visible{outline:2px solid var(--brand-2);outline-offset:2px;border-radius:8px}
 
 /* stat cards */
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:11px;margin-top:12px}
@@ -95,7 +104,7 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700}
 
 /* radar + tides */
 .radar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px;box-shadow:var(--shadow)}
-.radar img{width:100%;border-radius:8px;display:block;background:#dfe9ef;min-height:120px}
+.radar img{display:block;width:100%;max-width:600px;height:auto;margin:0 auto;border-radius:8px;background:#dfe9ef}
 .radar .cap{font-size:.76rem;color:var(--muted);margin-top:6px}
 .tides{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
 .tide-item{font-size:.8rem;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 9px}
@@ -138,3 +147,4 @@ body.eink .toggle,body.eink .radar,body.eink .updated .dot,body.eink footer{filt
 body.eink .card .val{font-size:1.9rem} body.eink h1{font-size:1.6rem} body.eink h2{font-size:1.25rem}
 body.eink .legend i{filter:grayscale(1)}
 body.eink iframe{display:none}
+body.eink .secnav{display:none}
