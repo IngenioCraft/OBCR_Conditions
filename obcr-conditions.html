@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rowing Conditions — Beekman Beach, Oyster Bay</title>
+<style>
+  /* ============================================================
+     OBCR BRAND COLORS — change these to rebrand
+     ============================================================ */
+  :root{
+    --brand:#0b4f6c; --brand-2:#1b98c9;
+    --bg:#f4f8fb; --card:#ffffff; --ink:#1c2b33; --muted:#5d7280; --line:#e2ecf2;
+    --good:#2e8b57; --caution:#c77f16; --rough:#c0392b; --storm:#7b241c;
+    --radius:14px; --shadow:0 1px 3px rgba(11,79,108,.08),0 6px 18px rgba(11,79,108,.06);
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.4;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:940px;margin:0 auto;padding:18px 16px 40px}
+  header.hd{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px}
+  h1{font-size:1.28rem;margin:0;color:var(--brand);letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:.85rem;margin:2px 0 14px}
+  .updated{font-size:.76rem;color:var(--muted);white-space:nowrap}
+  .updated .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:5px}
+
+  /* verdict banner */
+  .verdict{border-radius:16px;padding:16px 18px;color:#fff;box-shadow:var(--shadow);margin-bottom:8px}
+  .verdict .pill{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    background:rgba(255,255,255,.22);padding:3px 10px;border-radius:20px;margin-bottom:8px}
+  .verdict .headline{font-size:1.35rem;font-weight:800;line-height:1.15;margin:2px 0 8px}
+  .verdict .line{font-size:.95rem;opacity:.97;margin-top:5px}
+  .verdict .trend{font-weight:700}
+  .lv-good{background:linear-gradient(135deg,#2e8b57,#227a4a)}
+  .lv-caution{background:linear-gradient(135deg,#d98a1c,#b9720f)}
+  .lv-rough{background:linear-gradient(135deg,#d0402f,#a5301f)}
+  .lv-storm{background:linear-gradient(135deg,#7b241c,#591008)}
+
+  /* diagnostic */
+  .diag{display:none;background:#fff4f2;border:1px solid #f2c7bf;color:#8a2a1a;border-radius:10px;
+    padding:10px 13px;font-size:.82rem;margin:10px 0}
+  .diag b{color:#6f1f12}
+
+  /* stat grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:12px;margin-top:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 15px;
+    box-shadow:var(--shadow);position:relative;min-height:94px}
+  .card .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+  .card .val{font-size:1.7rem;font-weight:700;margin-top:6px;color:var(--brand);line-height:1.1}
+  .card .val small{font-size:.9rem;font-weight:600;color:var(--muted)}
+  .card .meta{font-size:.8rem;color:var(--muted);margin-top:4px}
+  .card .est{position:absolute;top:12px;right:13px;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--caution);border:1px solid var(--caution);border-radius:6px;padding:1px 5px;font-weight:600;opacity:.85}
+  .arrow{display:inline-block}
+
+  h2{font-size:.98rem;color:var(--brand);margin:26px 0 4px;font-weight:700}
+  .h2note{font-size:.8rem;color:var(--muted);margin:0 0 10px}
+
+  /* toggle */
+  .toggle{display:inline-flex;background:#e7f0f5;border-radius:10px;padding:3px;margin:6px 0 12px}
+  .toggle button{border:0;background:transparent;font:inherit;font-size:.82rem;font-weight:600;color:var(--muted);
+    padding:6px 13px;border-radius:8px;cursor:pointer}
+  .toggle button.on{background:#fff;color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+  /* forecast strip */
+  .strip{display:flex;gap:9px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+  .hour{flex:0 0 auto;width:82px;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--line);
+    border-radius:12px;padding:10px 7px 11px;text-align:center;box-shadow:var(--shadow)}
+  .hour.good{border-top-color:var(--good)} .hour.caution{border-top-color:var(--caution)}
+  .hour.rough{border-top-color:var(--rough)} .hour.storm{border-top-color:var(--storm)}
+  .hour .t{font-size:.72rem;color:var(--muted);font-weight:600}
+  .hour .temp{font-size:1.1rem;font-weight:700;color:var(--brand);margin:5px 0 2px}
+  .hour .wind{font-size:.78rem;color:var(--ink);margin-top:3px;font-weight:600}
+  .hour .gust{font-size:.72rem;color:var(--muted)}
+  .hour .rain{font-size:.7rem;color:var(--brand-2);margin-top:3px}
+  .legend{font-size:.74rem;color:var(--muted);margin-top:6px}
+  .legend span{display:inline-block;margin-right:12px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+
+  /* radar */
+  .radar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px;box-shadow:var(--shadow)}
+  .radar img{width:100%;border-radius:8px;display:block;background:#dfe9ef;min-height:120px}
+  .radar .cap{font-size:.76rem;color:var(--muted);margin-top:6px}
+
+  /* tides */
+  .tides{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+  .tide-item{font-size:.8rem;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+  .tide-item b.hi{color:var(--brand-2)} .tide-item b.lo{color:var(--muted)}
+
+  .note{background:#fff8ec;border:1px solid #f0dcae;border-radius:10px;padding:11px 13px;font-size:.8rem;color:#6b5320;margin-top:20px}
+  footer{margin-top:18px;font-size:.72rem;color:var(--muted);line-height:1.6}
+  footer a{color:var(--brand-2);text-decoration:none} footer a:hover{text-decoration:underline}
+  .err{color:var(--muted);font-size:.9rem;font-weight:600}
+  @media (max-width:420px){.card .val{font-size:1.45rem} h1{font-size:1.12rem} .verdict .headline{font-size:1.18rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hd">
+    <h1>Rowing Conditions · Beekman Beach</h1>
+    <div class="updated" id="updated">&nbsp;</div>
+  </header>
+  <div class="sub">Theodore Roosevelt / Beekman Beach, Oyster Bay, NY · updates automatically</div>
+
+  <div class="verdict lv-good" id="verdict">
+    <div class="pill">Loading…</div>
+    <div class="headline">Checking conditions…</div>
+  </div>
+
+  <div class="diag" id="diag"></div>
+
+  <h2>Right now on the water</h2>
+  <div class="grid" id="grid"></div>
+
+  <h2>How conditions change through the day</h2>
+  <p class="h2note">Each block is colored for rowability — green calm, amber caution, red rough. Watch which way the colors trend.</p>
+  <div class="toggle" id="toggle">
+    <button data-mode="hourly" class="on">Rest of today · hourly</button>
+    <button data-mode="q15">Next 3 hours · every 15 min</button>
+  </div>
+  <div class="strip" id="strip"><div class="err" style="padding:8px">Loading forecast…</div></div>
+  <div class="legend">
+    <span><i style="background:var(--good)"></i>Good</span>
+    <span><i style="background:var(--caution)"></i>Caution</span>
+    <span><i style="background:var(--rough)"></i>Rough</span>
+    <span><i style="background:var(--storm)"></i>Storms</span>
+  </div>
+
+  <h2>Doppler radar (rain moving in?)</h2>
+  <p class="h2note">Live loop from the NWS New York (Upton) radar — Oyster Bay is near the center.</p>
+  <div class="radar">
+    <img id="radar" alt="NWS KOKX radar loop">
+    <div class="cap" id="radarcap">Loading radar… · <a href="https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy03My41NCw0MC44OF0sInpvb20iOjh9fQ%3D%3D" target="_blank" rel="noopener">full interactive radar ↗</a></div>
+  </div>
+
+  <h2>Tides today &amp; tomorrow</h2>
+  <div class="tides" id="tides"><span class="err">Loading tides…</span></div>
+
+  <div class="note">
+    <b>How to read this:</b> the colored banner up top is the quick answer — whether it's calm enough to row now and whether
+    conditions are building or easing over the next few hours. Wind and gusts are what actually decide rowability in the bay.
+    <br><br>
+    <b>About wave height:</b> Beekman Beach sits inside a sheltered bay, so wave models can't resolve local chop and often read
+    near zero — treat it as an open-water estimate only and trust wind/gusts instead.
+    <br><br>
+    These are automated readings to help planning, not a substitute for a coach's or rower's judgment on the day.
+  </div>
+
+  <footer>
+    <div>Auto-refreshes every 10 minutes. Times in US Eastern.</div>
+    <div>Sources: air / wind / gusts / rain / sun &amp; waves — <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>;
+      tides &amp; water temp — <a href="https://tidesandcurrents.noaa.gov" target="_blank" rel="noopener">NOAA Tides &amp; Currents</a>
+      (water temp #8516945 Kings Point · tides #8516201 Oyster Bay); radar — <a href="https://radar.weather.gov" target="_blank" rel="noopener">NWS/NOAA</a>.</div>
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG  (edit these if needed)
+   ============================================================ */
+const LAT = 40.8767, LON = -73.5413;
+const TZ  = "America/New_York";
+const WATER_TEMP_STATION = "8516945";  // Kings Point, NY (nearest live water-temp sensor)
+const TIDE_STATION       = "8516201";  // Oyster Bay (tide predictions)
+const RADAR_STATION      = "KOKX";     // NWS New York / Upton — covers Long Island
+const REFRESH_MS = 10 * 60 * 1000;
+// Rowability thresholds (mph). Tune to your program's comfort level:
+const T = { cautionWind:10, cautionGust:17, roughWind:16, roughGust:23 };
+// Optional CORS proxy fallback — leave "" unless NOAA is blocked once hosted.
+// If needed, set to a proxy that takes an encoded URL, e.g. "https://corsproxy.io/?url="
+const PROXY_BASE = "";
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const fails = [];
+async function getJSON(url){
+  try{ const r = await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json(); }
+  catch(e){
+    if(PROXY_BASE){ const r = await fetch(PROXY_BASE+encodeURIComponent(url)); return await r.json(); }
+    throw e;
+  }
+}
+const compass = deg => { if(deg==null||isNaN(deg))return"";
+  return ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(deg/22.5)%16]; };
+const fmtTime = d => d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ});
+const fmtHour = d => d.toLocaleTimeString("en-US",{hour:"numeric",timeZone:TZ});
+const fmtHM   = d => d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ});
+const round = (v,n=0) => v==null||isNaN(v) ? null : Number(v).toFixed(n);
+const WMO = {0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Fog",51:"Light drizzle",
+  53:"Drizzle",55:"Heavy drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",71:"Light snow",73:"Snow",
+  75:"Heavy snow",80:"Showers",81:"Showers",82:"Heavy showers",95:"Thunderstorm",96:"Thunderstorm",99:"Thunderstorm"};
+
+/* rowability level from wind/gust/code -> {k,label,color} */
+function level(wind,gust,code){
+  if([95,96,99].includes(code)) return {k:"storm",label:"Thunderstorms"};
+  if(wind>T.roughWind || gust>T.roughGust) return {k:"rough",label:"Rough"};
+  if(wind>T.cautionWind || gust>T.cautionGust) return {k:"caution",label:"Caution"};
+  return {k:"good",label:"Good"};
+}
+const LV_RANK = {good:0,caution:1,rough:2,storm:3};
+
+/* stat cards (fixed order) */
+const cardData = {};
+const CARD_ORDER = ["water","air","precip","wind","gusts","wave","tide","sunrise","sunset"];
+const LABELS = {water:"Water temp",air:"Air temp",precip:"Chance of rain",wind:"Wind",gusts:"Gusts",
+  wave:"Wave height",tide:"Tide",sunrise:"Sunrise",sunset:"Sunset"};
+function setCard(k,valHtml,meta,est){
+  cardData[k] = `<div class="card">${est?'<span class="est">'+est+'</span>':''}<div class="lbl">${LABELS[k]}</div>`+
+    `<div class="val">${valHtml}</div>`+(meta?`<div class="meta">${meta}</div>`:"")+`</div>`;
+  $("grid").innerHTML = CARD_ORDER.filter(k=>cardData[k]).map(k=>cardData[k]).join("");
+}
+CARD_ORDER.forEach(k=>setCard(k,"…",""));
+
+/* keep latest data for the toggle */
+let WX=null, MAR=null;
+
+/* ============================================================
+   1) Open-Meteo — weather (hourly + 15-min) + verdict/trend
+   ============================================================ */
+async function loadWeather(){
+  const url = "https://api.open-meteo.com/v1/forecast?latitude="+LAT+"&longitude="+LON+
+    "&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code"+
+    "&minutely_15=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code"+
+    "&hourly=temperature_2m,precipitation_probability,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code"+
+    "&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timeformat=unixtime"+
+    "&timezone="+encodeURIComponent(TZ)+"&forecast_days=2";
+  try{
+    const d = await getJSON(url); WX=d;
+    const c=d.current, h=d.hourly;
+    setCard("air", round(c.temperature_2m)+"<small>°F</small>",
+            "Feels like "+round(c.apparent_temperature)+"°F · "+(WMO[c.weather_code]||""));
+    let ci=h.time.findIndex(t=>t*1000>Date.now()); ci=ci<=0?0:ci-1;
+    const pop=h.precipitation_probability?h.precipitation_probability[ci]:null;
+    setCard("precip", pop==null?"—":round(pop)+"<small>%</small>", "In the next hour");
+    const dir=compass(c.wind_direction_10m);
+    const arrow=c.wind_direction_10m!=null?`<span class="arrow" style="display:inline-block;transform:rotate(${(c.wind_direction_10m+180)%360}deg)">↑</span> `:"";
+    setCard("wind", arrow+round(c.wind_speed_10m)+"<small> mph "+dir+"</small>", "Blowing from the "+(dir||"—"));
+    setCard("gusts", round(c.wind_gusts_10m)+"<small> mph</small>", "Peak gusts right now");
+    setCard("sunrise", fmtTime(new Date(d.daily.sunrise[0]*1000)), "");
+    setCard("sunset", fmtTime(new Date(d.daily.sunset[0]*1000)), "");
+    buildVerdict(d);
+    return d;
+  }catch(e){
+    fails.push("Weather (Open-Meteo): "+e.message);
+    ["air","precip","wind","gusts"].forEach(k=>setCard(k,"<span class='err'>—</span>","unavailable"));
+    return null;
+  }
+}
+
+function buildVerdict(d){
+  const c=d.current, h=d.hourly;
+  const now=level(c.wind_speed_10m,c.wind_gusts_10m,c.weather_code);
+  // next 6 hours
+  let s=h.time.findIndex(t=>t*1000>=Date.now()); if(s<0)s=0;
+  let peakGust=c.wind_gusts_10m, peakWind=c.wind_speed_10m, peakT=null, worst=LV_RANK[now.k];
+  let minWind=c.wind_speed_10m, minT=null, best=LV_RANK[now.k];
+  for(let i=s;i<s+6&&i<h.time.length;i++){
+    const w=h.wind_speed_10m[i], g=h.wind_gusts_10m[i], lv=LV_RANK[level(w,g,h.weather_code[i]).k];
+    if(g>peakGust){peakGust=g;}
+    if(lv>worst){worst=lv;peakWind=w;peakGust=Math.max(peakGust,g);peakT=new Date(h.time[i]*1000);}
+    if(lv<best){best=lv;} if(w<minWind){minWind=w;minT=new Date(h.time[i]*1000);}
+  }
+  let trend, dirWord;
+  if(worst>LV_RANK[now.k]){ dirWord="↗ Building";
+    trend=`winds increasing toward ~${round(peakWind)} mph, gusting ${round(peakGust)}${peakT?" around "+fmtHour(peakT):""}. Better to get out earlier.`; }
+  else if(best<LV_RANK[now.k] && minT){ dirWord="↘ Easing";
+    trend=`conditions calming over the next few hours (down toward ~${round(minWind)} mph by ${fmtHour(minT)}).`; }
+  else { dirWord="→ Holding steady";
+    trend=`around ${round(c.wind_speed_10m)} mph, gusting ${round(c.wind_gusts_10m)}, for the next several hours.`; }
+
+  const dir=compass(c.wind_direction_10m);
+  const rainNow = h.precipitation_probability ? h.precipitation_probability[Math.max(0,s-1)] : null;
+  const rainTxt = rainNow==null?"" : rainNow>50?` Rain likely (${round(rainNow)}%).` : rainNow>20?` Slight chance of rain.` : ` No rain expected.`;
+  const heads={good:"Good to row",caution:"Row with caution",rough:"Rough — not advisable",storm:"Thunderstorms — stay off the water"};
+  const el=$("verdict");
+  el.className="verdict lv-"+now.k;
+  el.innerHTML=`<div class="pill">${now.label} right now</div>`+
+    `<div class="headline">${heads[now.k]}</div>`+
+    `<div class="line">Right now: <b>${round(c.wind_speed_10m)} mph ${dir}</b> wind, gusting <b>${round(c.wind_gusts_10m)}</b>.${rainTxt}</div>`+
+    `<div class="line"><span class="trend">${dirWord}</span> — ${trend}</div>`;
+}
+
+/* ============================================================
+   2) Open-Meteo Marine — waves (modeled) + SST fallback
+   ============================================================ */
+async function loadMarine(){
+  const url="https://marine-api.open-meteo.com/v1/marine?latitude="+LAT+"&longitude="+LON+
+    "&current=wave_height,sea_surface_temperature&hourly=wave_height&timeformat=unixtime"+
+    "&length_unit=imperial&timezone="+encodeURIComponent(TZ)+"&forecast_days=2";
+  try{
+    const d=await getJSON(url); MAR=d;
+    const wv=d.current?d.current.wave_height:null;
+    if(wv==null||isNaN(wv)) setCard("wave","<span style='font-size:1.05rem'>Calm / n/a</span>","Too sheltered to model — see wind","est");
+    else setCard("wave",round(wv,1)+"<small> ft</small>","Open-water estimate","est");
+    return d;
+  }catch(e){ fails.push("Waves (Open-Meteo Marine): "+e.message);
+    setCard("wave","<span class='err'>—</span>","unavailable","est"); return null; }
+}
+
+/* ============================================================
+   3) NOAA — live water temperature (Kings Point)
+   ============================================================ */
+async function loadWaterTemp(marine){
+  const url="https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station="+WATER_TEMP_STATION+
+    "&product=water_temperature&units=english&time_zone=lst_ldt&format=json&application=OBCR-conditions";
+  try{
+    const d=await getJSON(url);
+    if(d&&d.data&&d.data.length){ setCard("water",round(d.data[0].v,0)+"<small>°F</small>","Live · Kings Point buoy"); return; }
+    throw new Error("no data");
+  }catch(e){
+    const sst=marine&&marine.current?marine.current.sea_surface_temperature:null;
+    if(sst!=null&&!isNaN(sst)) setCard("water",round(sst,0)+"<small>°F</small>","Modeled estimate","est");
+    else { fails.push("Water temp (NOAA): "+e.message); setCard("water","<span class='err'>—</span>","unavailable"); }
+  }
+}
+
+/* ============================================================
+   4) NOAA — tide predictions (high/low)
+   ============================================================ */
+function ymdET(){ const p=new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+  const g=t=>p.find(x=>x.type===t).value; return g("year")+g("month")+g("day"); }
+async function loadTides(){
+  const url="https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date="+ymdET()+
+    "&range=48&station="+TIDE_STATION+"&product=predictions&datum=MLLW&interval=hilo&units=english"+
+    "&time_zone=gmt&format=json&application=OBCR-conditions";
+  try{
+    const d=await getJSON(url);
+    if(!d.predictions||!d.predictions.length) throw new Error("no tides");
+    const now=new Date();
+    const ev=d.predictions.map(p=>({t:new Date(p.t.replace(" ","T")+"Z"),v:p.v,type:p.type}));
+    const next=ev.find(e=>e.t>now)||ev[ev.length-1];
+    if(next){ const rising=next.type==="H";
+      setCard("tide", rising?'<span style="color:var(--brand-2)">Rising ▲</span>':'<span style="color:var(--muted)">Falling ▼</span>',
+        (rising?"Next high ":"Next low ")+fmtTime(next.t)+" · "+round(next.v,1)+" ft"); }
+    $("tides").innerHTML=ev.filter(e=>e.t>new Date(now.getTime()-3600000)).slice(0,8).map(e=>{
+      const cls=e.type==="H"?"hi":"lo", lab=e.type==="H"?"High":"Low";
+      return `<div class="tide-item"><b class="${cls}">${lab}</b> ${fmtTime(e.t)} · ${round(e.v,1)} ft</div>`; }).join("");
+  }catch(e){ fails.push("Tides (NOAA): "+e.message);
+    setCard("tide","<span class='err'>—</span>","unavailable");
+    $("tides").innerHTML="<span class='err'>Tide data unavailable right now.</span>"; }
+}
+
+/* ============================================================
+   Forecast strip — hourly (12h) or 15-min (3h)
+   ============================================================ */
+function popForTime(tsSec){ // nearest hourly precip probability
+  if(!WX||!WX.hourly||!WX.hourly.precipitation_probability) return null;
+  const H=WX.hourly; let idx=0;
+  for(let i=0;i<H.time.length;i++){ if(H.time[i]<=tsSec) idx=i; else break; }
+  return H.precipitation_probability[idx];
+}
+function waveForTime(tsSec){
+  if(!MAR||!MAR.hourly||!MAR.hourly.time) return null;
+  const M=MAR.hourly; let idx=-1;
+  for(let i=0;i<M.time.length;i++){ if(M.time[i]<=tsSec) idx=i; else break; }
+  return idx>=0?M.hourly_wave_height?M.hourly_wave_height[idx]:M.wave_height[idx]:null;
+}
+function renderForecast(mode){
+  if(!WX){ $("strip").innerHTML="<div class='err' style='padding:8px'>Forecast unavailable.</div>"; return; }
+  const src = mode==="q15" && WX.minutely_15 ? WX.minutely_15 : WX.hourly;
+  const nowMs=Date.now();
+  let s=src.time.findIndex(t=>t*1000>=nowMs); if(s<0)s=0;
+  const count=12;
+  let html="";
+  for(let i=s;i<s+count&&i<src.time.length;i++){
+    const tsSec=src.time[i], t=new Date(tsSec*1000);
+    const w=src.wind_speed_10m[i], g=src.wind_gusts_10m[i], code=src.weather_code?src.weather_code[i]:0;
+    const lv=level(w,g,code);
+    const pop=popForTime(tsSec);
+    html+=`<div class="hour ${lv.k}">
+      <div class="t">${mode==="q15"?fmtHM(t):fmtHour(t)}</div>
+      <div class="temp">${round(src.temperature_2m[i])}°</div>
+      <div class="wind">${round(w)} <span style="color:var(--muted);font-weight:400">${compass(src.wind_direction_10m?src.wind_direction_10m[i]:null)}</span></div>
+      <div class="gust">gust ${round(g)}</div>
+      ${pop!=null&&!isNaN(pop)?`<div class="rain">☔ ${round(pop)}%</div>`:``}
+    </div>`;
+  }
+  $("strip").innerHTML = html || "<div class='err' style='padding:8px'>Forecast unavailable.</div>";
+}
+$("toggle").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  [...$("toggle").children].forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  renderForecast(b.dataset.mode);
+});
+
+/* ============================================================
+   Radar
+   ============================================================ */
+function loadRadar(){
+  const img=$("radar");
+  img.onerror=()=>{ $("radarcap").innerHTML='Radar image unavailable here — <a href="https://radar.weather.gov" target="_blank" rel="noopener">open full radar ↗</a>'; };
+  img.onload=()=>{ $("radarcap").innerHTML='NWS '+RADAR_STATION+' loop · <a href="https://radar.weather.gov" target="_blank" rel="noopener">full interactive radar ↗</a>'; };
+  img.src="https://radar.weather.gov/ridge/standard/"+RADAR_STATION+"_loop.gif?_="+Date.now();
+}
+
+/* ============================================================
+   orchestrate
+   ============================================================ */
+async function refresh(){
+  fails.length=0;
+  const [weather,marine]=await Promise.all([loadWeather(),loadMarine()]);
+  const mode=($("toggle").querySelector(".on")||{}).dataset?.mode || "hourly";
+  renderForecast(mode);
+  await Promise.all([loadWaterTemp(marine),loadTides()]);
+  loadRadar();
+  // diagnostics
+  const diag=$("diag");
+  if(fails.length){ diag.style.display="block";
+    diag.innerHTML="<b>Some live data didn't load.</b> If you're viewing this inside a preview pane, that's expected — "+
+      "external data is blocked there and it will work once the page is hosted (e.g. GitHub Pages) or opened directly in a browser. "+
+      "Details: "+fails.join("; ")+"."; }
+  else diag.style.display="none";
+  $("updated").innerHTML='<span class="dot"></span>Updated '+fmtTime(new Date());
+}
+refresh();
+setInterval(refresh,REFRESH_MS);
+</script>
+</body>
+</html>
