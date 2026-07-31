@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Montauk — Surf, Boating, Fishing & SUP Conditions</title>
+<link rel="stylesheet" href="assets/conditions.css">
+<style>:root{--brand:#0d3b57;--brand-2:#1f8fb5}</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Montauk",
+  tagline: "Surf, boating, fishing and SUP conditions for the End — ocean side and harbor.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  waterQualityLink: "https://suffolkcountyny.gov/Departments/Health-Services/Environmental-Quality/Ecology/Beach-Monitoring-Program/AdvisoriesClosures",
+  waterQualityLabel: "Suffolk County beach advisories",
+  footNote: "Ocean-side surf, swell and water temp come from open-Atlantic models (reliable at Montauk). Water temp is live from the Montauk NOAA sensor. Coordinates are approximate — easy to fine-tune in this file.",
+  spots: [
+    { id:"ditch", name:"Ditch Plains (ocean / surf)", lat:41.0350, lon:-71.9220, marine:true, surf:true,
+      tideStation:"8510560", waterTempStation:"8510560",
+      note:"Montauk's classic south-facing surf break — real Atlantic swell. Surfing, ocean SUP, and swimming (mind the rips)." },
+    { id:"harbor", name:"Montauk Harbor / Point (boating & fishing)", lat:41.0720, lon:-71.9390, marine:true,
+      tideStation:"8510560", waterTempStation:"8510560",
+      note:"Lake Montauk inlet and the Point — the hub for boating and fishing. Watch wind against tide at the rips." }
+  ],
+  activities: ["surf","boat","fish","sup","swim","kayak"],
+  fishing: {
+    link: "https://dec.ny.gov/things-to-do/saltwater-fishing/recreational-fishing-regulations",
+    note: "Montauk — the surfcasting capital — peaks in the fall run (Oct–Nov) with striped bass blitzes and false albacore off the Point. Tuna and sharks run offshore through the summer.",
+    season: ["bass","fluke","seabass","scup","tautog","bluefish","weakfish"],
+    run: ["albie","tuna","shark","cod"]
+  },
+  shellfish: {
+    rainThresholdIn: 0.65,
+    note: "Lake Montauk and nearby East End harbors have hard clams and oysters. Watch for rain-triggered conditional closures and seasonal red-tide / biotoxin (PSP) closures, which hit East End harbors periodically.",
+    link: "https://dec.ny.gov/things-to-do/shellfishing/temporary-closures",
+    rainLink: "https://dec.ny.gov/things-to-do/saltwater-fishing/shellfishing/temporary-closures/emergency-rainfall-closure-criteria",
+    closureItemId: "fd806f23c1a54961b13d7553191afdf8",
+    mapEmbed: "https://nysdec.maps.arcgis.com/apps/webappviewer/index.html?id=d98abc91849f4ccf8c38dbb70f8a0042"
+  }
+};
+</script>
+<script src="assets/conditions.js"></script>
+</body>
+</html>

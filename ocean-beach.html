@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocean Beach, Fire Island — Ocean & Bay Conditions</title>
+<link rel="stylesheet" href="assets/conditions.css">
+<style>:root{--brand:#0a6b7c;--brand-2:#16b3c9}</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Ocean Beach, Fire Island",
+  tagline: "Ocean & bay conditions for everything out here — swim, surf, paddle, sail, fish, fly kites, build sandcastles, and watch for dolphins.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  waterQualityLink: "https://suffolkcountyny.gov/Departments/Health-Services/Environmental-Quality/Ecology/Beach-Monitoring-Program/AdvisoriesClosures",
+  waterQualityLabel: "Suffolk County beach advisories",
+  footNote: "Ocean-side surf, swell and water temp come from open-Atlantic models (reliable here) — always heed lifeguard flags and rip-current warnings. Bay-side (Great South Bay) is sheltered, so waves read low and wind is the better guide.",
+  spots: [
+    { id:"ocean", name:"Ocean side (Atlantic)", lat:40.6435, lon:-73.1548, marine:true, surf:true,
+      tideStation:"8515228",
+      note:"South-facing Atlantic beach — real surf, swell and rip currents. The spot for surfing, ocean swimming, sandcastles and dolphin-watching." },
+    { id:"bay", name:"Bay side (Great South Bay)", lat:40.6500, lon:-73.1535, marine:false,
+      tideStation:"8515186",
+      note:"North-facing, sheltered bay — calmer, flatter and usually warmer. Better for kayaking, paddleboarding, sailing and little kids." }
+  ],
+  activities: ["swim","surf","kayak","sup","sail","fish","beachwalk","beachday","kite","sandcastle","dolphin"]
+};
+</script>
+<script src="assets/conditions.js"></script>
+</body>
+</html>

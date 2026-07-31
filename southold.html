@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Southold — Shellfish, Boating & Fishing Conditions</title>
+<link rel="stylesheet" href="assets/conditions.css">
+<style>:root{--brand:#12525a;--brand-2:#2ba39a}</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Southold · Southold Bay",
+  tagline: "Shellfish safety, boating and fishing conditions for the North Fork (Peconic / Southold Bay).",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  waterQualityLink: "https://suffolkcountyny.gov/Departments/Health-Services/Environmental-Quality/Ecology/Beach-Monitoring-Program/AdvisoriesClosures",
+  waterQualityLabel: "Suffolk County beach advisories",
+  footNote: "On the North Fork bay side (Shelter Island Sound / Southold Bay). Water temp is a modeled estimate for this spot; tides are from the Greenport station nearby. Coordinates are approximate — easy to fine-tune in this file.",
+  spots: [
+    { id:"southold", name:"Southold Bay", lat:41.0450, lon:-72.4250, marine:true,
+      tideStation:"8511907",
+      note:"Peconic system off Clearview Ave — prime clam and oyster ground, and easy boating/fishing water. Sheltered, so it flattens fast when the wind lays down." }
+  ],
+  activities: ["boat","fish","kayak","sup","swim"],
+  fishing: {
+    link: "https://dec.ny.gov/things-to-do/saltwater-fishing/recreational-fishing-regulations",
+    note: "Peconic / Southold Bay is porgy and fluke central through the summer, with a strong fall blackfish bite. The prized Peconic bay scallop season opens the first Monday in November.",
+    season: ["fluke","scup","bluefish","weakfish","bass","seabass","tautog","scallop"],
+    run: ["snapper","crab"]
+  },
+  shellfish: {
+    rainThresholdIn: 0.65,
+    note: "Southold / Peconic is prime hard-clam (littleneck, cherrystone) and oyster ground, with bay scallops Nov–Mar. Spring and summer can bring red-tide / biotoxin (PSP) closures in the Peconics — always confirm the area is open before harvesting.",
+    link: "https://dec.ny.gov/things-to-do/shellfishing/temporary-closures",
+    rainLink: "https://dec.ny.gov/things-to-do/saltwater-fishing/shellfishing/temporary-closures/emergency-rainfall-closure-criteria",
+    closureItemId: "fd806f23c1a54961b13d7553191afdf8",
+    mapEmbed: "https://nysdec.maps.arcgis.com/apps/webappviewer/index.html?id=d98abc91849f4ccf8c38dbb70f8a0042"
+  }
+};
+</script>
+<script src="assets/conditions.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asharoken & Centerport — Conditions</title>
+<link rel="stylesheet" href="assets/conditions.css">
+<style>:root{--brand:#144e6b;--brand-2:#2a9dc4}</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Asharoken & Centerport",
+  tagline: "Conditions for beach walks, kayaking, paddleboarding, sailing, swimming and backyard gatherings.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  waterQualityLink: "https://suffolkcountyny.gov/Departments/Health-Services/Environmental-Quality/Ecology/Beach-Monitoring-Program/AdvisoriesClosures",
+  waterQualityLabel: "Suffolk County beach advisories",
+  footNote: "Long Island Sound water temp is a live reading from the Bridgeport sensor across the Sound (falls back to a modeled estimate). For Sound water quality you can also check Save the Sound's beach report. Coordinates are approximate — easy to fine-tune in this file.",
+  spots: [
+    { id:"asharoken", name:"Asharoken Beach", lat:40.9085, lon:-73.3490, marine:true,
+      tideStation:"8515586", waterTempStation:"8467150",
+      note:"Home beach on Long Island Sound — beach walks, kayaks, SUP, the sailboat, and backyard parties. Open Sound, so it can build a chop when the wind's up." },
+    { id:"centerport", name:"Centerport Yacht Club", lat:40.8915, lon:-73.3760, marine:false,
+      tideStation:"8515586",
+      note:"Sheltered harbor off Northport Bay — swimming and sailing out of the club. Calmer and usually warmer than the open Sound." }
+  ],
+  activities: ["swim","kayak","sup","sail","fish","beachwalk","beachday","party","dolphin","kite"]
+};
+</script>
+<script src="assets/conditions.js"></script>
+</body>
+</html>

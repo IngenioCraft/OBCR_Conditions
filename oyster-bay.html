@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oyster Bay — Rowing & Water Conditions (Beekman Beach)</title>
+<link rel="stylesheet" href="assets/conditions.css">
+<style>:root{--brand:#0b4f6c;--brand-2:#1b98c9}</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Oyster Bay · Beekman Beach",
+  tagline: "Rowing and on-the-water conditions for OBCR at Theodore Roosevelt / Beekman Beach.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  waterQualityLink: "https://suffolkcountyny.gov/Departments/Health-Services/Environmental-Quality/Ecology/Beach-Monitoring-Program/AdvisoriesClosures",
+  waterQualityLabel: "Suffolk County beach advisories",
+  footNote: "Beekman Beach sits inside a sheltered bay, so wave models can't resolve local chop and often read near zero — trust wind and gusts as the real signal for rowing.",
+  spots: [
+    { id:"beekman", name:"Beekman Beach", lat:40.8767, lon:-73.5413, marine:true,
+      tideStation:"8516201", waterTempStation:"8516945",
+      note:"Theodore Roosevelt / Beekman Beach, Oyster Bay. Water temp is live from the Kings Point sensor." }
+  ],
+  activities: ["row","kayak","sup","sail","fish","swim","beachwalk","dolphin"]
+};
+</script>
+<script src="assets/conditions.js"></script>
+</body>
+</html>
