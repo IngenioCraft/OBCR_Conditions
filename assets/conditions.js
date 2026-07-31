@@ -297,36 +297,42 @@ function skeleton(){
   const up=el("div","updated"); up.id="updated"; hd.appendChild(up);
   w.appendChild(hd);
   w.appendChild(el("div","tagline",CFG.tagline||""));
+  const navEl=el("nav","secnav"); navEl.id="secnav"; navEl.setAttribute("aria-label","Jump to section"); w.appendChild(navEl);
+  const nav=[];
+  function section(id,heading,label){ const h=el("h2",null,heading); h.id=id; nav.push({id,label:label||heading}); return h; }
   if(CFG.spots&&CFG.spots.length>1){ const st=el("div","spottabs"); st.id="spottabs"; w.appendChild(st); }
   w.appendChild(el("div","spotnote")).id="spotnote";
   w.appendChild(el("div","summary lv-good")).id="summary";
   w.appendChild(el("div","diag")).id="diag";
-  w.appendChild(el("h2",null,CFG.crew?"Crew go / no-go check":"Good for right now"));
+  w.appendChild(section("sec-now",CFG.crew?"Crew go / no-go check":"Good for right now","Now"));
   w.appendChild(el("div","acts")).id="acts";
-  w.appendChild(el("h2",null,"The numbers"));
+  w.appendChild(section("sec-numbers","The numbers","Numbers"));
   w.appendChild(el("div","grid")).id="grid";
-  w.appendChild(el("h2",null,"Through the day"));
+  w.appendChild(section("sec-forecast","Through the day","Forecast"));
   w.appendChild(el("p","h2note","Blocks are colored by how good conditions are — watch which way the colors trend."));
   const tg=el("div","toggle"); tg.id="toggle";
   tg.innerHTML='<button data-mode="hourly" class="on">Rest of today · hourly</button><button data-mode="q15">Next 3 hrs · 15 min</button>';
   w.appendChild(tg);
-  w.appendChild(el("div","strip")).id="strip";
+  const stripEl=el("div","strip"); stripEl.id="strip"; stripEl.tabIndex=0;
+  stripEl.setAttribute("role","group"); stripEl.setAttribute("aria-label","Hourly forecast — scroll horizontally with arrow keys"); w.appendChild(stripEl);
   w.appendChild(el("div","legend",'<span><i style="background:var(--good)"></i>Good</span><span><i style="background:var(--fair)"></i>Fair</span><span><i style="background:var(--poor)"></i>Rough</span><span><i style="background:var(--storm)"></i>Storms</span>'));
-  if(CFG.ferry){ w.appendChild(el("h2",null,"Ferries to Bay Shore")); const fe=el("div"); fe.id="ferry"; w.appendChild(fe); }
-  w.appendChild(el("h2",null,"Water quality"));
+  if(CFG.ferry){ w.appendChild(section("sec-ferry","Ferries to Bay Shore","Ferries")); const fe=el("div"); fe.id="ferry"; w.appendChild(fe); }
+  w.appendChild(section("sec-wq","Water quality","Water quality"));
   w.appendChild(el("div","wq")).id="wq";
-  if(CFG.fishing){ w.appendChild(el("h2",null,"What's biting now — seasonal fishing")); const f=el("div","wq"); f.id="fishing"; w.appendChild(f); }
-  if(CFG.shellfish){ w.appendChild(el("h2",null,"Shellfish safety")); const sh=el("div","wq"); sh.id="shellfish"; w.appendChild(sh); }
-  w.appendChild(el("h2",null,"Doppler radar"));
+  if(CFG.fishing){ w.appendChild(section("sec-fishing","What's biting now — seasonal fishing","Fishing")); const f=el("div","wq"); f.id="fishing"; w.appendChild(f); }
+  if(CFG.shellfish){ w.appendChild(section("sec-shellfish","Shellfish safety","Shellfish")); const sh=el("div","wq"); sh.id="shellfish"; w.appendChild(sh); }
+  w.appendChild(section("sec-radar","Doppler radar","Radar"));
   w.appendChild(el("p","h2note","NWS "+(CFG.radarStation||"KOKX")+" loop — your area is near the center."));
   const rad=el("div","radar"); rad.innerHTML='<img id="radar" alt="radar loop"><div class="cap" id="radarcap">Loading radar…</div>';
   w.appendChild(rad);
-  w.appendChild(el("h2",null,"Tides"));
+  w.appendChild(section("sec-tides","Tides","Tides"));
   w.appendChild(el("div","tides")).id="tides";
   w.appendChild(el("div","note",(CFG.footNote||"")+
     "<br><br>Activity ratings are automated guidance from weather &amp; marine models to help you plan — not a substitute for lifeguards, posted flags, official advisories, or your own judgment on the day."));
   w.appendChild(el("footer",null,sourcesHtml()));
   app.appendChild(w);
+  // build jump-nav
+  if(nav.length>1) navEl.innerHTML=nav.map(n=>'<a href="#'+n.id+'">'+n.label+'</a>').join(""); else navEl.style.display="none";
   // toggle handler
   $("#toggle").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
     [...$("#toggle").children].forEach(x=>x.classList.remove("on")); b.classList.add("on"); renderStrip(b.dataset.mode);});
@@ -371,12 +377,15 @@ async function loadActive(){
 }
 function currentMode(){const on=$("#toggle")&&$("#toggle").querySelector(".on");return on?on.dataset.mode:"hourly";}
 
+function activeActs(spot){
+  return (CFG.activities&&CFG.activities.length?ACTS.filter(x=>CFG.activities.includes(x.key)):ACTS).filter(x=>x.needs(spot));
+}
 function renderSummary(){
   const s=$("#summary");
   if(!COND){s.className="summary lv-poor";s.innerHTML='<div class="headline">Conditions unavailable right now.</div>';return;}
   const spot=CFG.spots[ACTIVE];
   if(CFG.crew){ renderCrewSummary(s,spot); return; }
-  const acts=ACTS.filter(a=>a.needs(spot)).map(a=>a.score(COND,spot));
+  const acts=activeActs(spot).map(a=>a.score(COND,spot));
   const good=acts.filter(a=>a.lv==="good").length, poor=acts.filter(a=>a.lv==="poor"||a.lv==="storm").length;
   let lv,head;
   if(isStorm(COND.code)){lv="storm";head="Thunderstorms around — stay out of the water";}
@@ -473,7 +482,7 @@ function renderActs(){
   const a=$("#acts"); if(!COND){a.innerHTML="<span class='err'>Unavailable.</span>";return;}
   if(CFG.crew){ renderCrew(a); return; }
   const spot=CFG.spots[ACTIVE];
-  const list=(CFG.activities&&CFG.activities.length?ACTS.filter(x=>CFG.activities.includes(x.key)):ACTS).filter(x=>x.needs(spot));
+  const list=activeActs(spot);
   a.innerHTML=list.map(act=>{const r=act.score(COND,spot);const lab={good:"Good",fair:"Fair",poor:"Poor",storm:"No"}[r.lv];
     return `<div class="act ${r.lv}"><div class="top"><div class="name"><span class="ico">${act.ico}</span>${act.label}</div>`+
       `<div class="rate">${lab}</div></div><div class="why">${r.why}</div></div>`;}).join("");
