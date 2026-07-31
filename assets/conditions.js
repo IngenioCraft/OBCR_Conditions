@@ -100,7 +100,7 @@ const ACTS=[
     if(c.waveFt!=null&&c.waveFt>2.5){r=Math.max(r,1);w.push("chop "+round(c.waveFt,1)+"ft");}
     return{lv:lvFromRank(r),why:w.join(", ")};}},
 
- {key:"sup",label:"Paddleboard",ico:"🏄‍♀️",needs:s=>true,score:(c)=>{
+ {key:"sup",label:"SUP",ico:"🏄‍♀️",needs:s=>true,score:(c)=>{
     if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms — no."};
     let r=0,w=[];
     if(c.windMph>T.paddleWindPoor||c.gustMph>T.paddleGustPoor){r=2;w.push("too windy for SUP "+round(c.windMph)+" g"+round(c.gustMph));}
@@ -363,7 +363,10 @@ async function loadActive(){
   const spot=CFG.spots[ACTIVE];
   $("#summary").innerHTML='<div class="pill">Loading…</div><div class="headline">Checking conditions…</div>';
   const now=Date.now();
-  if(!spot._data || now-spot._ts>REFRESH_MS){ spot._data=await fetchSpot(spot); spot._ts=now; }
+  const willFetch=!spot._data||now-spot._ts>REFRESH_MS;
+  if(willFetch){ const ph="<span class='err' style='padding:8px'>Updating…</span>";
+    if($("#acts"))$("#acts").innerHTML=ph; if($("#grid"))$("#grid").innerHTML=ph;
+    spot._data=await fetchSpot(spot); spot._ts=now; }
   DATA=spot._data; COND=deriveNow(DATA,spot);
   renderSummary(); renderCards(); renderActs(); renderStrip(currentMode()); renderWQ();
   if(CFG.ferry)renderFerry();
@@ -620,7 +623,7 @@ function renderShellfish(){
   const links=`<div class="detail" style="margin-top:6px">`+
     (S.link?`<a href="${S.link}" target="_blank" rel="noopener">DEC temporary closures ↗</a>`:"")+
     (S.rainLink?` · <a href="${S.rainLink}" target="_blank" rel="noopener">rainfall-closure rules ↗</a>`:"")+`</div>`;
-  const mapHtml=S.mapEmbed?`<iframe title="DEC shellfish closures map" loading="lazy" src="${S.mapEmbed}${S.mapEmbed.indexOf('?')>=0?'&':'?'}center=${sp.lon},${sp.lat}&level=13" style="width:100%;height:430px;border:1px solid var(--line);border-radius:12px;margin-top:10px"></iframe>`:"";
+  const mapHtml=S.mapEmbed?`<div class="detail" style="margin-top:10px">Live DEC closure map (may take a few seconds to load):</div><iframe title="DEC shellfish closures map" loading="lazy" src="${S.mapEmbed}${S.mapEmbed.indexOf('?')>=0?'&':'?'}center=${sp.lon},${sp.lat}&level=13" style="width:100%;height:430px;border:1px solid var(--line);border-radius:12px;margin-top:6px;background:#eef3f6"></iframe>`:"";
   box.innerHTML=
     `<div class="status ${lv}">Rain runoff: ${label}</div><div class="detail">${detail}</div>`+
     `<div id="closurestatus" class="detail" style="margin-top:10px">`+(S.closureItemId?`Checking this spot against DEC's live closure map…`:``)+`</div>`+

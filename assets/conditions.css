@@ -69,10 +69,10 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
   padding:11px 13px;box-shadow:var(--shadow)}
 .act.good{border-left-color:var(--good)} .act.fair{border-left-color:var(--fair)}
 .act.poor{border-left-color:var(--poor)} .act.storm{border-left-color:var(--storm)}
-.act .top{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.act .name{font-weight:700;font-size:.95rem;color:var(--ink)}
+.act .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.act .name{font-weight:700;font-size:.95rem;color:var(--ink);flex:1;min-width:0;overflow-wrap:anywhere}
 .act .name .ico{margin-right:5px}
-.act .rate{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:20px;color:#fff}
+.act .rate{flex:0 0 auto;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:20px;color:#fff}
 .act.good .rate{background:var(--good)} .act.fair .rate{background:var(--fair)}
 .act.poor .rate{background:var(--poor)} .act.storm .rate{background:var(--storm)}
 .act .why{font-size:.8rem;color:var(--muted);margin-top:6px}
