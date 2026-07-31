@@ -302,6 +302,7 @@ function skeleton(){
   w.appendChild(tg);
   w.appendChild(el("div","strip")).id="strip";
   w.appendChild(el("div","legend",'<span><i style="background:var(--good)"></i>Good</span><span><i style="background:var(--fair)"></i>Fair</span><span><i style="background:var(--poor)"></i>Rough</span><span><i style="background:var(--storm)"></i>Storms</span>'));
+  if(CFG.ferry){ w.appendChild(el("h2",null,"Ferries to Bay Shore")); const fe=el("div"); fe.id="ferry"; w.appendChild(fe); }
   w.appendChild(el("h2",null,"Water quality"));
   w.appendChild(el("div","wq")).id="wq";
   if(CFG.fishing){ w.appendChild(el("h2",null,"What's biting now — seasonal fishing")); const f=el("div","wq"); f.id="fishing"; w.appendChild(f); }
@@ -349,6 +350,7 @@ async function loadActive(){
   if(!spot._data || now-spot._ts>REFRESH_MS){ spot._data=await fetchSpot(spot); spot._ts=now; }
   DATA=spot._data; COND=deriveNow(DATA,spot);
   renderSummary(); renderCards(); renderActs(); renderStrip(currentMode()); renderWQ();
+  if(CFG.ferry)renderFerry();
   if(CFG.fishing)renderFishing(); if(CFG.shellfish)renderShellfish();
   renderTides(); loadRadar();
   const diag=$("#diag");
@@ -470,6 +472,50 @@ const RUN_WINDOWS={
 const MON=["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtMD(md){const p=md.split("-");return MON[+p[0]]+" "+(+p[1]);}
 function todayMD(){return new Intl.DateTimeFormat("en-CA",{timeZone:TZ,month:"2-digit",day:"2-digit"}).format(new Date());}
+/* ---- ferries ---- */
+function pad2(n){return (n<10?"0":"")+n;}
+function nowMinET(){const p=new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date());
+  return (+p.find(x=>x.type==="hour").value)*60+(+p.find(x=>x.type==="minute").value);}
+function dowET(){const wd=new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(new Date());
+  return {Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[wd];}
+function toMin(t){const p=t.split(":");return (+p[0])*60+(+p[1]);}
+function fmt12(t){let p=t.split(":"),h=+p[0],m=+p[1];const ap=h>=12?"PM":"AM";h=h%12||12;return h+":"+pad2(m)+" "+ap;}
+function nextDeps(list,now,k){
+  const mins=(list||[]).map(t=>({t,m:toMin(t)})).sort((a,b)=>a.m-b.m);
+  let up=mins.filter(x=>x.m>=now).slice(0,k), wrapped=false;
+  if(!up.length){up=mins.slice(0,k);wrapped=true;}
+  return {up,wrapped};
+}
+function depLine(nd){
+  if(!nd.up.length)return "—";
+  const first=`<span class="next">${fmt12(nd.up[0].t)}</span>`+(nd.wrapped?" (tomorrow, first boat)":"");
+  const rest=nd.up.slice(1).map(x=>fmt12(x.t)).join(", ");
+  return first+(rest?` · then ${rest}`:"");
+}
+function pickSchedule(F,t){
+  const list=F.schedules||[];
+  for(const s of list){ if(inRange(t,s.from,s.to))return{s,stale:false}; }
+  let best=null; list.forEach(s=>{ if(s.from<=t&&(!best||s.from>best.from))best=s; });
+  return {s:best||list[0],stale:true};
+}
+function renderFerry(){
+  const box=$("#ferry"); if(!box)return; const F=CFG.ferry||{};
+  if(!F.schedules||!F.schedules.length){box.innerHTML="";return;}
+  const t=todayMD(), now=nowMinET(), weekend=[5,6,0].includes(dowET());
+  const pick=pickSchedule(F,t), s=pick.s;
+  const cards=(s.routes||[]).map(r=>{
+    const set=weekend?r.weekend:r.weekday; if(!set)return "";
+    const toBay=nextDeps(set.toBay,now,3), toIsl=nextDeps(set.toIsland,now,3);
+    return `<div class="ferry"><h4>⛴️ ${r.name}</h4>`+
+      `<div class="dir"><b>→ To Bay Shore:</b><br>${depLine(toBay)}</div>`+
+      `<div class="dir"><b>← From Bay Shore:</b><br>${depLine(toIsl)}</div>`+
+      (r.link?`<a href="${r.link}" target="_blank" rel="noopener">full schedule ↗</a>`:"")+`</div>`;
+  }).join("");
+  const warn=pick.stale?`<div class="status poor" style="font-size:.94rem;margin-bottom:6px">⚠ Showing the ${s.label} schedule, but today is outside its dates (${fmtMD(s.from)}–${fmtMD(s.to)}). Fire Island Ferries likely changed seasons — please verify times.</div>`:"";
+  box.innerHTML=warn+`<div class="detail" style="margin-bottom:8px"><b>${s.label}</b> (${fmtMD(s.from)}–${fmtMD(s.to)}) · showing the <b>${weekend?"Fri–Sun":"Mon–Thu"}</b> schedule. ${F.note||""} `+
+    (F.link?`<a href="${F.link}" target="_blank" rel="noopener">all Fire Island Ferries schedules ↗</a>`:"")+`</div>`+
+    `<div class="ferries">${cards}</div>`;
+}
 function curMonth(){return +new Intl.DateTimeFormat("en-US",{timeZone:TZ,month:"numeric"}).format(new Date());}
 function inRange(t,s,e){return s<=e?(t>=s&&t<=e):(t>=s||t<=e);}
 function seasonStatus(sp,t){

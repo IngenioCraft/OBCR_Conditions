@@ -26,7 +26,31 @@ window.SPOT_CONFIG = {
       tideStation:"8515186",
       note:"North-facing, sheltered bay — calmer, flatter and usually warmer. Better for kayaking, paddleboarding, sailing and little kids." }
   ],
-  activities: ["swim","surf","kayak","sup","sail","fish","beachwalk","beachday","kite","sandcastle","dolphin"]
+  activities: ["swim","surf","kayak","sup","sail","fish","beachwalk","beachday","kite","sandcastle","dolphin"],
+  ferry: {
+    link: "https://fireislandferries.com/schedules/",
+    note: "Fire Island Ferries; weekend schedule is Fri–Sun. A few day-specific extra boats aren't shown here — check the official schedule for holidays and exact times.",
+    // Add more seasonal schedules here (spring/fall, winter). The page auto-picks the one whose
+    // dates include today, and warns if today falls outside every schedule. Times are 24-hour "HH:MM".
+    schedules: [
+      { label:"Summer 2026", from:"06-19", to:"09-08", routes:[
+        { name:"Ocean Beach ⇄ Bay Shore", link:"https://fireislandferries.com/schedules/ocean-beach/",
+          weekday:{
+            toIsland:["07:00","08:20","09:20","10:10","10:50","11:30","12:10","13:30","14:50","16:10","17:30","18:50","20:10","21:20","22:45"],
+            toBay:["06:00","07:40","08:50","10:00","10:50","11:30","12:10","12:45","14:10","15:30","16:50","18:10","19:30","20:45","22:00","23:30"] },
+          weekend:{
+            toIsland:["07:00","08:20","09:20","10:00","10:50","11:30","12:10","13:00","14:10","15:00","16:10","17:20","18:35","19:50","21:10","22:20"],
+            toBay:["06:00","07:40","08:50","10:00","10:40","11:30","12:10","12:50","13:40","14:50","15:35","16:45","18:00","19:10","20:30","21:45","22:50","23:50"] } },
+        { name:"Seaview ⇄ Bay Shore", link:"https://fireislandferries.com/schedules/seaview/",
+          weekday:{
+            toIsland:["07:00","09:10","10:30","12:00","13:30","14:50","16:10","17:50","19:20","21:00"],
+            toBay:["07:35","09:40","11:00","12:30","14:00","15:20","16:40","18:20","19:50","21:30"] },
+          weekend:{
+            toIsland:["07:00","09:10","10:30","12:10","13:30","14:50","16:10","17:40","19:10","20:45"],
+            toBay:["07:35","09:40","11:00","12:40","14:00","15:20","16:40","18:10","19:40","21:15"] } }
+      ] }
+    ]
+  }
 };
 </script>
 <script src="assets/conditions.js"></script>
