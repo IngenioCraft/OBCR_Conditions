@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coastal Conditions — Long Island</title>
+<link rel="stylesheet" href="assets/conditions.css">
+<style>
+  :root{--brand:#0b4f6c;--brand-2:#1b98c9}
+  .loc{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:16px}
+  .loc a{display:block;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 18px 16px;box-shadow:var(--shadow);text-decoration:none;color:var(--ink)}
+  .loc a:hover{border-color:var(--brand-2)}
+  .loc .nm{font-weight:800;color:var(--brand);font-size:1.08rem}
+  .loc .ds{font-size:.86rem;color:var(--muted);margin-top:5px}
+  .loc .go{font-size:.82rem;color:var(--brand-2);font-weight:600;margin-top:10px}
+  .eink{font-size:.78rem;color:var(--muted);margin-top:4px}
+  .eink a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hd"><h1>Coastal Conditions · Long Island</h1></header>
+  <div class="tagline">Live water &amp; weather conditions with activity guidance for a few favorite spots. Pick a location.</div>
+
+  <div class="loc">
+    <a href="oyster-bay.html">
+      <div class="nm">Oyster Bay · Beekman Beach</div>
+      <div class="ds">Rowing and on-the-water conditions for OBCR at Theodore Roosevelt / Beekman Beach.</div>
+      <div class="go">View conditions →</div>
+      <div class="eink"><a href="oyster-bay.html?eink=1">e-ink display version</a></div>
+    </a>
+    <a href="ocean-beach.html">
+      <div class="nm">Ocean Beach · Fire Island</div>
+      <div class="ds">Ocean &amp; bay sides — swim, surf, paddle, sail, fish, kites, sandcastles, dolphins.</div>
+      <div class="go">View conditions →</div>
+      <div class="eink"><a href="ocean-beach.html?eink=1">e-ink display version</a></div>
+    </a>
+    <a href="asharoken.html">
+      <div class="nm">Asharoken &amp; Centerport</div>
+      <div class="ds">Beach walks, kayaks, SUP, sailing, swimming at Centerport YC, and backyard parties.</div>
+      <div class="go">View conditions →</div>
+      <div class="eink"><a href="asharoken.html?eink=1">e-ink display version</a></div>
+    </a>
+    <a href="montauk.html">
+      <div class="nm">Montauk</div>
+      <div class="ds">Surf, boating, fishing &amp; SUP — ocean and harbor. Seasonal fishing and shellfish safety.</div>
+      <div class="go">View conditions →</div>
+      <div class="eink"><a href="montauk.html?eink=1">e-ink display version</a></div>
+    </a>
+    <a href="southold.html">
+      <div class="nm">Southold · Peconic Bay</div>
+      <div class="ds">Shellfish (clam/oyster) safety, boating &amp; fishing on the North Fork, with seasonal calendars.</div>
+      <div class="go">View conditions →</div>
+      <div class="eink"><a href="southold.html?eink=1">e-ink display version</a></div>
+    </a>
+  </div>
+
+  <div class="note" style="margin-top:22px">
+    All data comes from free, no-key public APIs (Open-Meteo &amp; NOAA), fetched live in your browser.
+    Nothing to install or pay for. See <b>README.md</b> for how to host, customize, and build a standalone e-ink display.
+  </div>
+  <footer>Built for personal/community use · not a substitute for lifeguards, official advisories, or your own judgment on the day.</footer>
+</div>
+</body>
+</html>
