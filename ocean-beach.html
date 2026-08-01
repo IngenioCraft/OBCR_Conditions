@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ocean Beach, Fire Island — Ocean & Bay Conditions</title>
-<link rel="stylesheet" href="assets/conditions.css?v=20260811">
+<link rel="stylesheet" href="assets/conditions.css?v=20260812">
 <style>:root{--brand:#0a6b7c;--brand-2:#16b3c9}</style>
 <!-- Privacy-friendly analytics by Plausible -->
 <script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
@@ -28,6 +28,16 @@ window.SPOT_CONFIG = {
   spots: [
     { id:"ocean", name:"Ocean side (Atlantic)", lat:40.6435, lon:-73.1548, marine:true, surf:true,
       tideStation:"8515228",
+      // Lifeguard duty at Cottage Walk (ocean side), from villageofoceanbeach.org/services.
+      // Swim ratings factor this in; kite-flying is only "ok" when guards are OFF duty (busy beach).
+      // Days: 0=Sun … 6=Sat. Times 24h "HH:MM". Auto-selects the period covering today; easy to update each season.
+      lifeguard:{ station:"Cottage Walk", source:"https://villageofoceanbeach.org/services",
+        periods:[
+          { from:"05-22", to:"06-14", label:"weekends only", hours:{ 6:["09:00","17:30"], 0:["09:00","17:00"] } },
+          { from:"06-19", to:"06-21", label:"opening weekend", hours:{ 5:["09:00","17:00"], 6:["09:00","17:30"], 0:["09:00","17:00"] } },
+          { from:"06-22", to:"09-07", label:"daily", hours:{ 1:["09:00","17:00"], 2:["09:00","17:00"], 3:["09:00","17:00"], 4:["09:00","17:00"], 5:["09:00","17:00"], 6:["09:00","17:30"], 0:["09:00","17:00"] } },
+          { from:"09-12", to:"09-20", label:"weekends only", hours:{ 6:["09:00","17:30"], 0:["09:00","17:00"] } }
+        ] },
       note:"South-facing Atlantic beach — real surf, swell and rip currents. The spot for surfing, ocean swimming, sandcastles and dolphin-watching." },
     { id:"bay", name:"Bay side (Great South Bay)", lat:40.6500, lon:-73.1535, marine:true,
       tideStation:"8515186",
@@ -64,6 +74,6 @@ window.SPOT_CONFIG = {
   }
 };
 </script>
-<script src="assets/conditions.js?v=20260811"></script>
+<script src="assets/conditions.js?v=20260812"></script>
 </body>
 </html>
