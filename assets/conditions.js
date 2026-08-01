@@ -318,10 +318,11 @@ function skeleton(){
   w.appendChild(section("sec-numbers","The numbers","Numbers"));
   w.appendChild(el("div","grid")).id="grid";
   w.appendChild(section("sec-forecast","Through the day","Forecast"));
-  w.appendChild(el("p","h2note","Blocks are colored by how good conditions are — watch which way the colors trend."));
+  w.appendChild(el("p","h2note","Timeline shows the trend at a glance — the color band is the overall rating (mainly wind &amp; gusts); lines are wind and gusts. Scroll the cards below for exact numbers."));
   const tg=el("div","toggle"); tg.id="toggle";
-  tg.innerHTML='<button data-mode="q15">Next 3 hrs · 15 min</button><button data-mode="hourly" class="on">Next 12 hrs</button><button data-mode="h48">Next 48 hrs</button>';
+  tg.innerHTML='<button data-mode="q15">Next 3 hrs · 30 min</button><button data-mode="hourly" class="on">Next 12 hrs · hourly</button><button data-mode="h48">Next 48 hrs · 3-hourly</button>';
   w.appendChild(tg);
+  w.appendChild(el("div","spark")).id="sparkline";
   const stripEl=el("div","strip"); stripEl.id="strip"; stripEl.tabIndex=0;
   stripEl.setAttribute("role","group"); stripEl.setAttribute("aria-label","Hourly forecast — scroll horizontally with arrow keys"); w.appendChild(stripEl);
   w.appendChild(el("div","legend",'<span><i style="background:var(--good)"></i>Good</span><span><i style="background:var(--fair)"></i>Fair</span><span><i style="background:var(--poor)"></i>Rough</span><span><i style="background:var(--storm)"></i>Storms</span>'));
@@ -344,7 +345,7 @@ function skeleton(){
   if(nav.length>1) navEl.innerHTML=nav.map(n=>'<a href="#'+n.id+'">'+n.label+'</a>').join(""); else navEl.style.display="none";
   // toggle handler
   $("#toggle").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
-    [...$("#toggle").children].forEach(x=>x.classList.remove("on")); b.classList.add("on"); renderStrip(b.dataset.mode);});
+    [...$("#toggle").children].forEach(x=>x.classList.remove("on")); b.classList.add("on"); renderStrip(b.dataset.mode); renderSpark(b.dataset.mode);});
   // spot tabs
   if(CFG.spots&&CFG.spots.length>1){
     const st=$("#spottabs");
@@ -377,7 +378,7 @@ async function loadActive(){
     if($("#acts"))$("#acts").innerHTML=ph; if($("#grid"))$("#grid").innerHTML=ph;
     spot._data=await fetchSpot(spot); spot._ts=now; }
   DATA=spot._data; COND=deriveNow(DATA,spot);
-  renderSummary(); renderCards(); renderActs(); renderStrip(currentMode()); renderWQ();
+  renderSummary(); renderCards(); renderActs(); renderStrip(currentMode()); renderSpark(currentMode()); renderWQ();
   if(CFG.ferry)renderFerry();
   if(CFG.fishing)renderFishing(); if(CFG.shellfish)renderShellfish();
   renderTides(); loadRadar();
@@ -502,30 +503,74 @@ function renderActs(){
       `<div class="rate">${lab}</div></div><div class="why">${r.why}</div></div>`;}).join("");
 }
 
+function stripLv(w,g,code){ if(isStorm(code))return"storm"; if(w>16||g>23)return"poor"; if(w>10||g>17)return"fair"; return"good"; }
+const LVHEX={good:"#1f7a49",fair:"#9a6410",poor:"#c0392b",storm:"#7b241c"};
+function stripConf(mode,wx){
+  if(mode==="q15")return{src:wx.minutely_15||wx.hourly,step:2,count:6,fine:true};   // 30-min × 6 = 3h
+  if(mode==="h48")return{src:wx.hourly,step:3,count:16};                            // 3-hourly × 16 = 48h
+  return{src:wx.hourly,step:1,count:12};                                            // hourly × 12
+}
 function renderStrip(mode){
   const strip=$("#strip"); const wx=DATA&&DATA.wx; if(!wx){strip.innerHTML="<div class='err' style='padding:8px'>Forecast unavailable.</div>";return;}
-  const src=mode==="q15"&&wx.minutely_15?wx.minutely_15:wx.hourly;
-  const count=mode==="q15"?12:mode==="h48"?48:12;
+  const conf=stripConf(mode,wx), src=conf.src;
   const now=Date.now(); let s=src.time.findIndex(t=>t*1000>=now); if(s<0)s=0;
   const H=wx.hourly;
   function popAt(ts){if(!H.precipitation_probability)return null;let idx=0;for(let i=0;i<H.time.length;i++){if(H.time[i]<=ts)idx=i;else break;}return H.precipitation_probability[idx];}
   const wkday=d=>new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(d);
-  let html="",lastDay=null;
-  for(let i=s;i<s+count&&i<src.time.length;i++){
+  let html="",lastDay=null,shown=0;
+  for(let i=s;i<src.time.length&&shown<conf.count;i+=conf.step){
     const ts=src.time[i],d=new Date(ts*1000);const w=src.wind_speed_10m[i],g=src.wind_gusts_10m[i],code=src.weather_code?src.weather_code[i]:0;
-    // color by simple wind/gust/storm rowability
-    let lv="good"; if(isStorm(code))lv="storm"; else if(w>16||g>23)lv="poor"; else if(w>10||g>17)lv="fair";
-    const pop=popAt(ts);
-    const day=wkday(d), showDay=(mode!=="q15")&&day!==lastDay; lastDay=day;
-    html+=`<div class="hour ${lv}">`+
-      (mode!=="q15"?`<div class="day">${showDay?day:"&nbsp;"}</div>`:``)+
-      `<div class="t">${mode==="q15"?fmtHM(d):fmtHour(d)}</div>`+
+    const lv=stripLv(w,g,code), pop=popAt(ts), day=wkday(d);
+    if(!conf.fine&&lastDay!==null&&day!==lastDay) html+=`<div class="daybreak"><span>${day}</span></div>`;
+    lastDay=day;
+    const isNow=shown===0;
+    html+=`<div class="hour ${lv}${isNow?' now':''}">`+
+      (isNow?`<div class="nowtag">NOW</div>`:``)+
+      `<div class="t">${conf.fine?fmtHM(d):fmtHour(d)}</div>`+
       `<div class="temp">${round(src.temperature_2m[i])}°</div>`+
       `<div class="wind">${round(w)} <span style="color:var(--muted);font-weight:400">${compass(src.wind_direction_10m?src.wind_direction_10m[i]:null)}</span></div>`+
       `<div class="gust">gust ${round(g)}</div>`+
       (pop!=null&&!isNaN(pop)?`<div class="rain">☔ ${round(pop)}%</div>`:``)+`</div>`;
+    shown++;
   }
   strip.innerHTML=html||"<div class='err' style='padding:8px'>Forecast unavailable.</div>";
+}
+/* compact SVG timeline: wind + gust lines over a good/fair/rough band, day dividers, now marker */
+function renderSpark(mode){
+  const box=$("#sparkline"); if(!box)return; const wx=DATA&&DATA.wx; if(!wx){box.innerHTML="";return;}
+  const hours=mode==="h48"?48:mode==="hourly"?12:3;
+  const bsrc=(mode==="q15"&&wx.minutely_15)?wx.minutely_15:wx.hourly;
+  const now=Date.now(), endMs=now+hours*3600*1000;
+  let s=bsrc.time.findIndex(t=>t*1000>=now); if(s<0)s=0;
+  const pts=[];
+  for(let i=s;i<bsrc.time.length;i++){const tms=bsrc.time[i]*1000; if(tms>endMs+60000)break;
+    pts.push({t:tms,w:bsrc.wind_speed_10m[i],g:bsrc.wind_gusts_10m[i],code:bsrc.weather_code?bsrc.weather_code[i]:0});}
+  if(pts.length<2){box.innerHTML="";return;}
+  const W=Math.max(320,Math.round(box.clientWidth||820)), Hh=94, padL=6,padR=6, top=16, lineBot=58, bandY=64, bandH=18;
+  const t0=now,t1=endMs, X=tms=>padL+(W-padL-padR)*(tms-t0)/(t1-t0||1);
+  const maxV=Math.max(15,...pts.map(p=>p.g||0)), Y=v=>lineBot-(lineBot-top)*(v/maxV);
+  let bands="";
+  for(let i=0;i<pts.length;i++){const x0=X(pts[i].t),x1=i<pts.length-1?X(pts[i+1].t):W-padR;
+    bands+=`<rect x="${x0.toFixed(1)}" y="${bandY}" width="${Math.max(0.6,x1-x0).toFixed(1)}" height="${bandH}" fill="${LVHEX[stripLv(pts[i].w,pts[i].g,pts[i].code)]}"><title>${fmtHour(new Date(pts[i].t))} — ${round(pts[i].w)} mph, gust ${round(pts[i].g)}</title></rect>`;}
+  const wPath="M"+pts.map(p=>X(p.t).toFixed(1)+","+Y(p.w).toFixed(1)).join(" L");
+  const gPath="M"+pts.map(p=>X(p.t).toFixed(1)+","+Y(p.g).toFixed(1)).join(" L");
+  let dividers="",dlabels="";
+  for(let hMs=Math.ceil(now/3600000)*3600000; hMs<=endMs; hMs+=3600000){
+    const dt=new Date(hMs), hr=+new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",hour12:false}).format(dt), x=X(hMs);
+    if(hr===0){dividers+=`<line x1="${x.toFixed(1)}" y1="8" x2="${x.toFixed(1)}" y2="${bandY+bandH}" stroke="#b9c8d1" stroke-width="1" stroke-dasharray="3 3"/>`;
+      dlabels+=`<text x="${(x+4).toFixed(1)}" y="13" font-size="11" font-weight="700" fill="#1b98c9">${new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(dt)}</text>`;}
+  }
+  const tickStep=hours<=3?1:hours<=12?3:6; let ticks="";
+  for(let hMs=Math.ceil(now/(tickStep*3600000))*(tickStep*3600000); hMs<endMs; hMs+=tickStep*3600000){
+    const x=X(hMs); if(x>padL+14&&x<W-14) ticks+=`<text x="${x.toFixed(1)}" y="${Hh-2}" font-size="10" fill="#5d7280" text-anchor="middle">${fmtHour(new Date(hMs))}</text>`;}
+  const nx=X(now);
+  const nowMark=`<line x1="${nx.toFixed(1)}" y1="8" x2="${nx.toFixed(1)}" y2="${bandY+bandH}" stroke="#0b4f6c" stroke-width="1.5"/><text x="${(nx+3).toFixed(1)}" y="${bandY+bandH-4}" font-size="9" font-weight="800" fill="#0b4f6c">now</text>`;
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" height="${Hh}" role="img" aria-label="Timeline of wind, gusts and overall conditions across the window">`+
+    dividers+
+    `<path d="${gPath}" fill="none" stroke="#9bb7c4" stroke-width="1.5" stroke-dasharray="4 3"/>`+
+    `<path d="${wPath}" fill="none" stroke="#0b4f6c" stroke-width="2"/>`+
+    bands+nowMark+dlabels+ticks+`</svg>`+
+    `<div class="sparkkey"><span><i style="background:#0b4f6c"></i>wind</span><span><i style="background:#9bb7c4"></i>gusts</span><span><i style="background:#1f7a49"></i>band = overall rating</span></div>`;
 }
 
 function renderWQ(){
