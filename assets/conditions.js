@@ -318,14 +318,14 @@ function skeleton(){
   w.appendChild(section("sec-numbers","The numbers","Numbers"));
   w.appendChild(el("div","grid")).id="grid";
   w.appendChild(section("sec-forecast","Through the day","Forecast"));
-  w.appendChild(el("p","h2note","Timeline shows the trend at a glance — the color band is the overall rating (mainly wind &amp; gusts); lines are wind and gusts. Scroll the cards below for exact numbers."));
+  w.appendChild(el("p","h2note","Timeline shows the trend — hover (or tap) for exact numbers; it highlights the matching card. Band = overall rating (wind &amp; gusts); bottom lane = rain chance; shaded = night."));
   const tg=el("div","toggle"); tg.id="toggle";
-  tg.innerHTML='<button data-mode="q15">Next 3 hrs · 30 min</button><button data-mode="hourly" class="on">Next 12 hrs · hourly</button><button data-mode="h48">Next 48 hrs · 3-hourly</button>';
+  tg.innerHTML='<button data-mode="q15">Next 3 hrs · 15→30 min</button><button data-mode="hourly" class="on">Next 12 hrs · hourly</button><button data-mode="h48">Next 48 hrs · 3-hourly</button>';
   w.appendChild(tg);
-  w.appendChild(el("div","spark")).id="sparkline";
+  const cw=el("div","chartwrap"); cw.id="chartwrap"; cw.innerHTML='<svg id="chart"></svg><div class="tip" id="tip"></div>'; w.appendChild(cw);
+  w.appendChild(el("div","sparkkey",'<span><i style="background:#0b4f6c"></i>wind</span><span><i class="dash"></i>gusts</span><span><i style="background:var(--good)"></i>good</span><span><i style="background:var(--fair)"></i>fair</span><span><i style="background:var(--poor)"></i>rough</span><span><i style="background:#5fa8d3"></i>rain&nbsp;%</span><span>· tint = now→+3h</span>'));
   const stripEl=el("div","strip"); stripEl.id="strip"; stripEl.tabIndex=0;
-  stripEl.setAttribute("role","group"); stripEl.setAttribute("aria-label","Hourly forecast — scroll horizontally with arrow keys"); w.appendChild(stripEl);
-  w.appendChild(el("div","legend",'<span><i style="background:var(--good)"></i>Good</span><span><i style="background:var(--fair)"></i>Fair</span><span><i style="background:var(--poor)"></i>Rough</span><span><i style="background:var(--storm)"></i>Storms</span>'));
+  stripEl.setAttribute("role","group"); stripEl.setAttribute("aria-label","Forecast cards — scroll horizontally; hover a card to highlight it on the chart"); w.appendChild(stripEl);
   if(CFG.ferry){ w.appendChild(section("sec-ferry","Ferries to Bay Shore","Ferries")); const fe=el("div"); fe.id="ferry"; w.appendChild(fe); }
   w.appendChild(section("sec-wq","Water quality","Water quality"));
   w.appendChild(el("div","wq")).id="wq";
@@ -345,7 +345,8 @@ function skeleton(){
   if(nav.length>1) navEl.innerHTML=nav.map(n=>'<a href="#'+n.id+'">'+n.label+'</a>').join(""); else navEl.style.display="none";
   // toggle handler
   $("#toggle").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b)return;
-    [...$("#toggle").children].forEach(x=>x.classList.remove("on")); b.classList.add("on"); renderStrip(b.dataset.mode); renderSpark(b.dataset.mode);});
+    [...$("#toggle").children].forEach(x=>x.classList.remove("on")); b.classList.add("on"); renderForecast(b.dataset.mode);});
+  attachChartHover();
   // spot tabs
   if(CFG.spots&&CFG.spots.length>1){
     const st=$("#spottabs");
@@ -378,7 +379,7 @@ async function loadActive(){
     if($("#acts"))$("#acts").innerHTML=ph; if($("#grid"))$("#grid").innerHTML=ph;
     spot._data=await fetchSpot(spot); spot._ts=now; }
   DATA=spot._data; COND=deriveNow(DATA,spot);
-  renderSummary(); renderCards(); renderActs(); renderStrip(currentMode()); renderSpark(currentMode()); renderWQ();
+  renderSummary(); renderCards(); renderActs(); renderForecast(currentMode()); renderWQ();
   if(CFG.ferry)renderFerry();
   if(CFG.fishing)renderFishing(); if(CFG.shellfish)renderShellfish();
   renderTides(); loadRadar();
@@ -505,72 +506,106 @@ function renderActs(){
 
 function stripLv(w,g,code){ if(isStorm(code))return"storm"; if(w>16||g>23)return"poor"; if(w>10||g>17)return"fair"; return"good"; }
 const LVHEX={good:"#1f7a49",fair:"#9a6410",poor:"#c0392b",storm:"#7b241c"};
-function stripConf(mode,wx){
-  if(mode==="q15")return{src:wx.minutely_15||wx.hourly,step:2,count:6,fine:true};   // 30-min × 6 = 3h
-  if(mode==="h48")return{src:wx.hourly,step:3,count:16};                            // 3-hourly × 16 = 48h
-  return{src:wx.hourly,step:1,count:12};                                            // hourly × 12
+const LVLAB={good:"Good",fair:"Fair",poor:"Rough",storm:"Storms"};
+let FPTS=[], FGEO=null, _rz=null;
+function idxBefore(times,ms){let s=0;for(let i=0;i<times.length;i++){if(times[i]*1000<=ms)s=i;else break;}return s;}
+function popAtH(H,tms){if(!H||!H.precipitation_probability)return null;let idx=0;for(let i=0;i<H.time.length;i++){if(H.time[i]*1000<=tms)idx=i;else break;}return H.precipitation_probability[idx];}
+function nightAt(tms){const dy=DATA&&DATA.wx&&DATA.wx.daily; if(!dy||!dy.sunrise)return false;
+  for(let i=0;i<dy.time.length;i++){if(tms>=dy.sunrise[i]*1000&&tms<=dy.sunset[i]*1000)return false;} return true;}
+/* one shared point set for both the chart and the cards (keeps hover linkage 1:1) */
+function forecastPoints(mode){
+  const wx=DATA&&DATA.wx; if(!wx)return[];
+  const now=Date.now(), H=wx.hourly; let src,offs=[];
+  if(mode==="q15"){src=wx.minutely_15||wx.hourly; offs=[0,1,2,3,4,5,6,8,10,12];}   // 15-min to 90m, then 30-min
+  else if(mode==="h48"){src=wx.hourly; for(let k=0;k<=48;k+=3)offs.push(k);}         // 3-hourly × 48h
+  else {src=wx.hourly; for(let k=0;k<=12;k++)offs.push(k);}                          // hourly × 12h
+  const s=idxBefore(src.time,now), pts=[];
+  offs.forEach(k=>{const i=s+k; if(i>=src.time.length)return; const tms=src.time[i]*1000,w=src.wind_speed_10m[i],g=src.wind_gusts_10m[i],code=src.weather_code?src.weather_code[i]:0;
+    pts.push({tms,date:new Date(tms),wind:w,gust:g,temp:src.temperature_2m[i],dir:src.wind_direction_10m?src.wind_direction_10m[i]:null,precip:popAtH(H,tms),code,rating:stripLv(w,g,code)});});
+  return pts;
 }
-function renderStrip(mode){
-  const strip=$("#strip"); const wx=DATA&&DATA.wx; if(!wx){strip.innerHTML="<div class='err' style='padding:8px'>Forecast unavailable.</div>";return;}
-  const conf=stripConf(mode,wx), src=conf.src;
-  const now=Date.now(); let s=src.time.findIndex(t=>t*1000>=now); if(s<0)s=0;
-  const H=wx.hourly;
-  function popAt(ts){if(!H.precipitation_probability)return null;let idx=0;for(let i=0;i<H.time.length;i++){if(H.time[i]<=ts)idx=i;else break;}return H.precipitation_probability[idx];}
-  const wkday=d=>new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(d);
-  let html="",lastDay=null,shown=0;
-  for(let i=s;i<src.time.length&&shown<conf.count;i+=conf.step){
-    const ts=src.time[i],d=new Date(ts*1000);const w=src.wind_speed_10m[i],g=src.wind_gusts_10m[i],code=src.weather_code?src.weather_code[i]:0;
-    const lv=stripLv(w,g,code), pop=popAt(ts), day=wkday(d);
-    if(!conf.fine&&lastDay!==null&&day!==lastDay) html+=`<div class="daybreak"><span>${day}</span></div>`;
-    lastDay=day;
-    const isNow=shown===0;
-    html+=`<div class="hour ${lv}${isNow?' now':''}">`+
+function renderForecast(mode){ FPTS=forecastPoints(mode); drawChart(mode); drawCards(mode); }
+function drawCards(mode){
+  const strip=$("#strip"); if(!strip)return;
+  if(!FPTS.length){strip.innerHTML="<div class='err' style='padding:8px'>Forecast unavailable.</div>";return;}
+  const fine=mode==="q15", wkday=d=>new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(d);
+  let html="",lastDay=null;
+  FPTS.forEach((p,i)=>{const day=wkday(p.date);
+    if(!fine&&lastDay!==null&&day!==lastDay)html+=`<div class="daybreak"><span>${day}</span></div>`;
+    lastDay=day; const isNow=i===0;
+    html+=`<div class="hour ${p.rating}${isNow?' now':''}" data-i="${i}">`+
       (isNow?`<div class="nowtag">NOW</div>`:``)+
-      `<div class="t">${conf.fine?fmtHM(d):fmtHour(d)}</div>`+
-      `<div class="temp">${round(src.temperature_2m[i])}°</div>`+
-      `<div class="wind">${round(w)} <span style="color:var(--muted);font-weight:400">${compass(src.wind_direction_10m?src.wind_direction_10m[i]:null)}</span></div>`+
-      `<div class="gust">gust ${round(g)}</div>`+
-      (pop!=null&&!isNaN(pop)?`<div class="rain">☔ ${round(pop)}%</div>`:``)+`</div>`;
-    shown++;
-  }
-  strip.innerHTML=html||"<div class='err' style='padding:8px'>Forecast unavailable.</div>";
+      `<div class="t">${fine?fmtHM(p.date):fmtHour(p.date)}</div>`+
+      `<div class="temp">${round(p.temp)}°</div>`+
+      `<div class="wind">${round(p.wind)} <span style="color:var(--muted);font-weight:400">${compass(p.dir)}</span></div>`+
+      `<div class="gust">gust ${round(p.gust)}</div>`+
+      (p.precip!=null&&!isNaN(p.precip)?`<div class="rain">☔ ${round(p.precip)}%</div>`:``)+`</div>`;
+  });
+  strip.innerHTML=html;
+  strip.querySelectorAll(".hour").forEach(c=>{const i=+c.dataset.i;
+    c.addEventListener("pointerenter",()=>highlightPoint(i,false)); c.addEventListener("pointerleave",clearHi);});
 }
-/* compact SVG timeline: wind + gust lines over a good/fair/rough band, day dividers, now marker */
-function renderSpark(mode){
-  const box=$("#sparkline"); if(!box)return; const wx=DATA&&DATA.wx; if(!wx){box.innerHTML="";return;}
-  const hours=mode==="h48"?48:mode==="hourly"?12:3;
-  const bsrc=(mode==="q15"&&wx.minutely_15)?wx.minutely_15:wx.hourly;
-  const now=Date.now(), endMs=now+hours*3600*1000;
-  let s=bsrc.time.findIndex(t=>t*1000>=now); if(s<0)s=0;
-  const pts=[];
-  for(let i=s;i<bsrc.time.length;i++){const tms=bsrc.time[i]*1000; if(tms>endMs+60000)break;
-    pts.push({t:tms,w:bsrc.wind_speed_10m[i],g:bsrc.wind_gusts_10m[i],code:bsrc.weather_code?bsrc.weather_code[i]:0});}
-  if(pts.length<2){box.innerHTML="";return;}
-  const W=Math.max(320,Math.round(box.clientWidth||820)), Hh=94, padL=6,padR=6, top=16, lineBot=58, bandY=64, bandH=18;
-  const t0=now,t1=endMs, X=tms=>padL+(W-padL-padR)*(tms-t0)/(t1-t0||1);
-  const maxV=Math.max(15,...pts.map(p=>p.g||0)), Y=v=>lineBot-(lineBot-top)*(v/maxV);
-  let bands="";
-  for(let i=0;i<pts.length;i++){const x0=X(pts[i].t),x1=i<pts.length-1?X(pts[i+1].t):W-padR;
-    bands+=`<rect x="${x0.toFixed(1)}" y="${bandY}" width="${Math.max(0.6,x1-x0).toFixed(1)}" height="${bandH}" fill="${LVHEX[stripLv(pts[i].w,pts[i].g,pts[i].code)]}"><title>${fmtHour(new Date(pts[i].t))} — ${round(pts[i].w)} mph, gust ${round(pts[i].g)}</title></rect>`;}
-  const wPath="M"+pts.map(p=>X(p.t).toFixed(1)+","+Y(p.w).toFixed(1)).join(" L");
-  const gPath="M"+pts.map(p=>X(p.t).toFixed(1)+","+Y(p.g).toFixed(1)).join(" L");
-  let dividers="",dlabels="";
-  for(let hMs=Math.ceil(now/3600000)*3600000; hMs<=endMs; hMs+=3600000){
-    const dt=new Date(hMs), hr=+new Intl.DateTimeFormat("en-GB",{timeZone:TZ,hour:"2-digit",hour12:false}).format(dt), x=X(hMs);
-    if(hr===0){dividers+=`<line x1="${x.toFixed(1)}" y1="8" x2="${x.toFixed(1)}" y2="${bandY+bandH}" stroke="#b9c8d1" stroke-width="1" stroke-dasharray="3 3"/>`;
-      dlabels+=`<text x="${(x+4).toFixed(1)}" y="13" font-size="11" font-weight="700" fill="#1b98c9">${new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(dt)}</text>`;}
-  }
-  const tickStep=hours<=3?1:hours<=12?3:6; let ticks="";
-  for(let hMs=Math.ceil(now/(tickStep*3600000))*(tickStep*3600000); hMs<endMs; hMs+=tickStep*3600000){
-    const x=X(hMs); if(x>padL+14&&x<W-14) ticks+=`<text x="${x.toFixed(1)}" y="${Hh-2}" font-size="10" fill="#5d7280" text-anchor="middle">${fmtHour(new Date(hMs))}</text>`;}
-  const nx=X(now);
-  const nowMark=`<line x1="${nx.toFixed(1)}" y1="8" x2="${nx.toFixed(1)}" y2="${bandY+bandH}" stroke="#0b4f6c" stroke-width="1.5"/><text x="${(nx+3).toFixed(1)}" y="${bandY+bandH-4}" font-size="9" font-weight="800" fill="#0b4f6c">now</text>`;
-  box.innerHTML=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" height="${Hh}" role="img" aria-label="Timeline of wind, gusts and overall conditions across the window">`+
-    dividers+
-    `<path d="${gPath}" fill="none" stroke="#9bb7c4" stroke-width="1.5" stroke-dasharray="4 3"/>`+
-    `<path d="${wPath}" fill="none" stroke="#0b4f6c" stroke-width="2"/>`+
-    bands+nowMark+dlabels+ticks+`</svg>`+
-    `<div class="sparkkey"><span><i style="background:#0b4f6c"></i>wind</span><span><i style="background:#9bb7c4"></i>gusts</span><span><i style="background:#1f7a49"></i>band = overall rating</span></div>`;
+function drawChart(mode){
+  const svg=$("#chart"), wrap=$("#chartwrap"); if(!svg)return;
+  const pts=FPTS; if(pts.length<2){svg.innerHTML="";return;}
+  const W=Math.max(320,Math.round((wrap&&wrap.clientWidth)||820)), H=214;
+  const padL=40,padR=14,padTop=14,lineBot=116,bandY=122,bandH=13,rainY=140,rainH=17,xLabY=176, botY=rainY+rainH;
+  const t0=pts[0].tms, tEnd=pts[pts.length-1].tms;
+  const X=tms=>padL+(W-padL-padR)*(tms-t0)/((tEnd-t0)||1);
+  const maxG=Math.max(15,...pts.map(p=>p.gust||0));
+  const niceMax=maxG<=15?15:maxG<=20?20:maxG<=30?30:Math.ceil(maxG/10)*10, yStep=niceMax<=15?5:niceMax<=30?10:15;
+  const Y=v=>lineBot-(lineBot-padTop)*(v/niceMax);
+  FGEO={W,X,Y};
+  let shade=""; for(let ms=t0;ms<tEnd;ms+=900000){if(nightAt(ms)){const x0=X(ms),x1=X(Math.min(ms+900000,tEnd));shade+=`<rect x="${x0.toFixed(1)}" y="${padTop}" width="${Math.max(0.5,x1-x0).toFixed(1)}" height="${botY-padTop}" fill="#e7edf1"/>`;}}
+  let hi=""; if(mode!=="q15"){const x0=X(t0),x1=X(Math.min(t0+3*3600000,tEnd)); hi=`<rect x="${x0.toFixed(1)}" y="${padTop}" width="${(x1-x0).toFixed(1)}" height="${botY-padTop}" fill="#1b98c9" opacity="0.08"/>`;}
+  let yg=""; for(let v=0;v<=niceMax;v+=yStep){const y=Y(v).toFixed(1); yg+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef2f5" stroke-width="1"/><text x="${padL-6}" y="${(+y+3).toFixed(1)}" font-size="10" fill="#8397a3" text-anchor="end">${v}</text>`;}
+  yg+=`<text x="6" y="${padTop+4}" font-size="9.5" fill="#8397a3">mph</text>`;
+  const wkday=d=>new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(d), labelEvery=pts.length>13?2:1;
+  let vg="",band="",rain="",dayd="",xl="",lastDay=wkday(pts[0].date);
+  pts.forEach((p,i)=>{const x=X(p.tms);
+    vg+=`<line x1="${x.toFixed(1)}" y1="${padTop}" x2="${x.toFixed(1)}" y2="${bandY}" stroke="#f0f4f7" stroke-width="1"/>`;
+    if(i<pts.length-1){const x1=X(pts[i+1].tms);band+=`<rect x="${x.toFixed(1)}" y="${bandY}" width="${Math.max(0.6,x1-x).toFixed(1)}" height="${bandH}" fill="${LVHEX[p.rating]}"/>`;}
+    if(p.precip!=null&&p.precip>0){const segW=(i<pts.length-1?X(pts[i+1].tms)-x:(i>0?x-X(pts[i-1].tms):12)),bw=Math.min(9,Math.max(3,segW*0.55)),bh=rainH*p.precip/100;
+      rain+=`<rect x="${(x-bw/2).toFixed(1)}" y="${(rainY+rainH-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1" fill="#5fa8d3" opacity="0.9"/>`;}
+    const dy=wkday(p.date);
+    if(i>0&&dy!==lastDay)dayd+=`<line x1="${x.toFixed(1)}" y1="${padTop-6}" x2="${x.toFixed(1)}" y2="${botY}" stroke="#9db4c0" stroke-width="1" stroke-dasharray="3 3"/><text x="${(x+4).toFixed(1)}" y="${padTop}" font-size="11" font-weight="700" fill="#1b98c9">${dy}</text>`;
+    lastDay=dy;
+    if(i%labelEvery===0)xl+=`<text x="${x.toFixed(1)}" y="${xLabY}" font-size="10" fill="#5d7280" text-anchor="middle">${mode==="q15"?fmtHM(p.date):fmtHour(p.date)}</text>`;
+  });
+  const wPath="M"+pts.map(p=>X(p.tms).toFixed(1)+","+Y(p.wind).toFixed(1)).join(" L");
+  const gPath="M"+pts.map(p=>X(p.tms).toFixed(1)+","+Y(p.gust).toFixed(1)).join(" L");
+  const dots=pts.map(p=>`<circle cx="${X(p.tms).toFixed(1)}" cy="${Y(p.wind).toFixed(1)}" r="2.4" fill="#0b4f6c"/>`).join("");
+  const nx=X(t0);
+  const nowM=`<line x1="${nx.toFixed(1)}" y1="${padTop-6}" x2="${nx.toFixed(1)}" y2="${botY}" stroke="#0b4f6c" stroke-width="1.5"/><text x="${(nx+3).toFixed(1)}" y="${(botY-4).toFixed(1)}" font-size="9" font-weight="800" fill="#0b4f6c">now</text>`;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`); svg.setAttribute("height",H); svg.setAttribute("role","img");
+  svg.setAttribute("aria-label","Timeline of wind, gusts, rain chance and overall conditions");
+  svg.innerHTML=shade+hi+yg+vg+band+rain+`<text x="6" y="${(botY-3).toFixed(1)}" font-size="9" fill="#5fa8d3">☔%</text>`+
+    `<path d="${gPath}" fill="none" stroke="#9bb7c4" stroke-width="1.6" stroke-dasharray="4 3"/>`+
+    `<path d="${wPath}" fill="none" stroke="#0b4f6c" stroke-width="2.2"/>`+
+    dots+dayd+xl+nowM+
+    `<line id="cross" x1="0" y1="${padTop}" x2="0" y2="${botY}" stroke="#0b4f6c" stroke-width="1" opacity="0"/>`+
+    `<circle id="cdot" r="4.5" fill="#1b98c9" stroke="#fff" stroke-width="1.5" opacity="0"/>`;
+}
+function highlightPoint(i,fromChart){
+  const p=FPTS[i]; if(!p||!FGEO)return; const cross=$("#cross"),dot=$("#cdot"),tip=$("#tip"),svg=$("#chart");
+  const x=FGEO.X(p.tms),y=FGEO.Y(p.wind);
+  if(cross){cross.setAttribute("x1",x);cross.setAttribute("x2",x);cross.setAttribute("opacity",".5");}
+  if(dot){dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("opacity","1");}
+  if(tip&&svg){const rect=svg.getBoundingClientRect(),sc=rect.width?rect.width/FGEO.W:1;tip.style.left=(x*sc)+"px";tip.style.top=(y*sc)+"px";
+    tip.innerHTML=`<b>${fmtHM(p.date)}</b> · ${new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(p.date)}<br>wind <b>${round(p.wind)}</b> mph · gust <b>${round(p.gust)}</b>`+
+      (p.precip!=null?`<br>☔ rain <b>${round(p.precip)}%</b>`:``)+`<br><span class="r" style="background:${LVHEX[p.rating]}"></span>${LVLAB[p.rating]}`;
+    tip.style.opacity="1";}
+  const strip=$("#strip"); if(strip)strip.querySelectorAll(".hour").forEach(c=>c.classList.toggle("hl",+c.dataset.i===i));
+  if(fromChart){const card=document.querySelector('#strip .hour[data-i="'+i+'"]'); if(card&&card.scrollIntoView)card.scrollIntoView({inline:"nearest",block:"nearest"});}
+}
+function clearHi(){const cross=$("#cross"),dot=$("#cdot"),tip=$("#tip");if(cross)cross.setAttribute("opacity","0");if(dot)dot.setAttribute("opacity","0");if(tip)tip.style.opacity="0";
+  const s=$("#strip");if(s)s.querySelectorAll(".hour").forEach(c=>c.classList.remove("hl"));}
+function nearestPoint(mx){let best=0,bd=1e9;FPTS.forEach((p,i)=>{const d=Math.abs(FGEO.X(p.tms)-mx);if(d<bd){bd=d;best=i;}});return best;}
+function attachChartHover(){
+  const svg=$("#chart"); if(!svg)return;
+  svg.addEventListener("pointermove",e=>{if(!FGEO)return;const rect=svg.getBoundingClientRect();const mx=(e.clientX-rect.left)*(FGEO.W/(rect.width||FGEO.W));highlightPoint(nearestPoint(mx),true);});
+  svg.addEventListener("pointerleave",clearHi);
+  window.addEventListener("resize",()=>{clearTimeout(_rz);_rz=setTimeout(()=>{if(FPTS.length)renderForecast(currentMode());},160);});
 }
 
 function renderWQ(){
