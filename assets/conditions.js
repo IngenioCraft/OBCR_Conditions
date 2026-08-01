@@ -916,6 +916,72 @@ function venuePillHTML(v){
   return `<div class="act ${lv}"><div class="top"><div class="name"><span class="ico">${v.ico}</span>${v.label}</div>`+
     `<div class="rate">${rate}</div></div><div class="why">${why}</div></div>`;
 }
+/* ---------- visible planets (needs astronomy-engine, loaded on demand) ---------- */
+const PLANETS=[
+  {b:"Venus",nm:"Venus"},{b:"Jupiter",nm:"Jupiter"},{b:"Mars",nm:"Mars"},
+  {b:"Saturn",nm:"Saturn"},{b:"Mercury",nm:"Mercury"}
+];
+let _astroLib=null; // null=untried, Promise while loading, true=ready, false=failed
+function loadAstroLib(){
+  if(_astroLib===true)return Promise.resolve(true);
+  if(_astroLib===false)return Promise.resolve(false);
+  if(_astroLib)return _astroLib;
+  if(typeof window!=="undefined"&&window.Astronomy){_astroLib=true;return Promise.resolve(true);}
+  _astroLib=new Promise(res=>{
+    if(typeof document==="undefined"){_astroLib=false;return res(false);}
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js";
+    s.async=true;
+    s.onload=()=>{_astroLib=!!window.Astronomy;res(_astroLib);};
+    s.onerror=()=>{_astroLib=false;res(false);};
+    document.head.appendChild(s);
+  });
+  return _astroLib;
+}
+function planetAltAz(A,body,time,obs){
+  const eq=A.Equator(body,time,obs,true,true);
+  const hor=A.Horizon(time,obs,eq.ra,eq.dec,"normal");
+  return {alt:hor.altitude,az:hor.azimuth};
+}
+function visiblePlanets(spot){
+  const A=(typeof window!=="undefined")?window.Astronomy:null; if(!A)return null;
+  let obs,sunset,sunrise; const now=new Date();
+  try{
+    obs=new A.Observer(spot.lat,spot.lon,0);
+    sunset=A.SearchRiseSet("Sun",obs,-1,now,1);
+    sunrise=A.SearchRiseSet("Sun",obs,+1,now,1);
+  }catch(e){return null;}
+  if(!sunset||!sunrise)return null;
+  const eveT=new A.AstroTime(new Date(sunset.date.getTime()+70*60000));
+  const morT=new A.AstroTime(new Date(sunrise.date.getTime()-70*60000));
+  const eve=[],mor=[];
+  for(const p of PLANETS){
+    try{
+      const e=planetAltAz(A,p.b,eveT,obs); if(e.alt>7)eve.push({nm:p.nm,alt:e.alt,dir:compass(e.az)});
+      const m=planetAltAz(A,p.b,morT,obs); if(m.alt>7)mor.push({nm:p.nm,alt:m.alt,dir:compass(m.az)});
+    }catch(e){}
+  }
+  eve.sort((a,b)=>b.alt-a.alt); mor.sort((a,b)=>b.alt-a.alt);
+  return {eve,mor};
+}
+function planetsHTML(spot){
+  const v=visiblePlanets(spot); if(!v)return null;
+  const fmt=arr=>arr.map(p=>`${p.nm} <span style="color:var(--muted)">(${p.dir}, ${Math.round(p.alt)}° up)</span>`).join(", ");
+  const parts=[];
+  if(v.eve.length)parts.push(`<b>after dusk</b> — ${fmt(v.eve)}`);
+  if(v.mor.length)parts.push(`<b>before dawn</b> — ${fmt(v.mor)}`);
+  if(!parts.length)return "No bright planets are well-placed tonight — they're too close to the sun this week.";
+  return "Look "+parts.join("; ")+".";
+}
+function fillPlanets(spot){
+  const box=$("#planets"); if(!box)return;
+  loadAstroLib().then(ok=>{
+    const cur=$("#planets"); if(!cur)return; // section may have re-rendered
+    if(!ok){cur.innerHTML="<b>🪐 Planets:</b> couldn't load the planet almanac just now — try a refresh.";return;}
+    const h=planetsHTML(spot);
+    cur.innerHTML=h?`<b>🪐 Planets tonight:</b> ${h}`:"<b>🪐 Planets:</b> none well-placed tonight.";
+  });
+}
 function renderAstro(){
   const box=$("#astro"); if(!box)return; const spot=CFG.spots[ACTIVE], now=new Date();
   const mp=moonPhase(now), fd=d=>d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
@@ -924,7 +990,9 @@ function renderAstro(){
     `<div class="detail">Next full moon ${fd(mp.nextFull)} · new moon ${fd(mp.nextNew)}.</div></div></div>`+
     `<div class="detail" style="margin-top:12px"><b>🌈 Rainbow watch:</b> ${rainbowStatus(spot).full}</div>`+
     `<div class="detail" style="margin-top:10px"><b>☄️ Meteor showers:</b> ${meteorNow(now,mp.illum)}</div>`+
-    `<div class="detail" style="margin-top:10px;font-style:italic">Computed locally from the date &amp; sun angle — meteor peaks are approximate; a stargazing app has exact rise/set times.</div>`;
+    `<div class="detail" id="planets" style="margin-top:10px"><b>🪐 Planets:</b> checking the sky…</div>`+
+    `<div class="detail" style="margin-top:10px;font-style:italic">Moon, rainbow &amp; meteor peaks are computed locally (approximate); planet positions use the astronomy-engine almanac. A stargazing app has exact rise/set times.</div>`;
+  fillPlanets(spot);
 }
 function renderTides(){
   const t=$("#tides"); const ev=DATA&&DATA.tideEvents;
