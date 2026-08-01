@@ -213,7 +213,7 @@ async function fetchSpot(spot){
   const aqU="https://air-quality-api.open-meteo.com/v1/air-quality?latitude="+lat+"&longitude="+lon+
     "&current=us_aqi&timezone="+encodeURIComponent(TZ);
   const marU=spot.marine?("https://marine-api.open-meteo.com/v1/marine?latitude="+lat+"&longitude="+lon+
-    "&current=wave_height,wave_period,sea_surface_temperature&hourly=wave_height&length_unit=imperial&timeformat=unixtime&timezone="+encodeURIComponent(TZ)):null;
+    "&current=wave_height,wave_period,sea_surface_temperature&hourly=wave_height&length_unit=imperial&temperature_unit=fahrenheit&timeformat=unixtime&timezone="+encodeURIComponent(TZ)):null;
 
   const [wx,aq,mar]=await Promise.all([
     getJSON(wxU).catch(e=>{fails.push("Weather: "+e.message);return null;}),
@@ -391,6 +391,17 @@ async function loadActive(){
 }
 function currentMode(){const on=$("#toggle")&&$("#toggle").querySelector(".on");return on?on.dataset.mode:"hourly";}
 
+/* how each activity behaves after dark: 'ok' = unaffected, 'caution' = cap at Fair, default = No after dark */
+const NIGHT={fish:"ok",beachwalk:"ok",party:"ok",boat:"caution",sail:"caution"};
+function scoreAct(act,c,spot){
+  let r=act.score(c,spot);
+  if(!c.isDay && r.lv!=="storm"){
+    const nb=NIGHT[act.key]||"no";
+    if(nb==="no") r={lv:"poor",why:"after dark — wait for daylight"};
+    else if(nb==="caution" && RANK[r.lv]<1) r={lv:"fair",why:"after dark — lights &amp; extra caution"};
+  }
+  return r;
+}
 function activeActs(spot){
   return (CFG.activities&&CFG.activities.length?ACTS.filter(x=>CFG.activities.includes(x.key)):ACTS).filter(x=>x.needs(spot));
 }
@@ -399,7 +410,7 @@ function renderSummary(){
   if(!COND){s.className="summary lv-poor";s.innerHTML='<div class="headline">Conditions unavailable right now.</div>';return;}
   const spot=CFG.spots[ACTIVE];
   if(CFG.crew){ renderCrewSummary(s,spot); return; }
-  const acts=activeActs(spot).map(a=>a.score(COND,spot));
+  const acts=activeActs(spot).map(a=>scoreAct(a,COND,spot));
   const good=acts.filter(a=>a.lv==="good").length, poor=acts.filter(a=>a.lv==="poor"||a.lv==="storm").length;
   let lv,head;
   if(isStorm(COND.code)){lv="storm";head="Thunderstorms around — stay out of the water";}
@@ -428,45 +439,57 @@ function windTrend(){
   return`<b>→ Holding steady</b> for the next few hours.`;
 }
 
+function crewItems(c){
+  const items=[]; const add=(key,lv,label,ico,why)=>items.push({key,lv,label,ico,why});
+  if(c.windMph>16)add("wind","poor","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — too rough for shells");
+  else if(c.windMph>10)add("wind","fair","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — chop building");
+  else add("wind","good","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — light");
+  if(c.gustMph>23)add("gusts","poor","Gusts","🌬️",round(c.gustMph)+" mph — dangerous puffs");
+  else if(c.gustMph>17)add("gusts","fair","Gusts","🌬️",round(c.gustMph)+" mph — watch the puffs");
+  else add("gusts","good","Gusts","🌬️",round(c.gustMph)+" mph");
+  if(c.windMph>16)add("water","poor","Water surface","🌊","Whitecaps / rough water");
+  else if(c.windMph>11)add("water","fair","Water surface","🌊","Chop building");
+  else add("water","good","Water surface","🌊","Calm — good set");
+  const cw=coldWater(c.waterF); if(cw)add("coldwater",cw.lv,"Cold water","🥶",cw.msg);
+  const fg=fogStatus(c.visMi); if(fg)add("visibility",fg.lv,"Visibility","🌫️",fg.msg);
+  if(isStorm(c.code))add("lightning","storm","Lightning","⛈️","Thunderstorms — off the water now");
+  else add("lightning","good","Lightning","⛈️","No storms nearby");
+  if(!c.isDay)add("daylight","poor","Daylight","🌅","Dark — outside sunrise–sunset");
+  else { const toSet=c.sunset?(c.sunset-new Date())/60000:999;
+    if(toSet<30&&toSet>=0)add("daylight","fair","Daylight","🌅","Sunset ~"+fmtHour(c.sunset)+" — little light left");
+    else add("daylight","good","Daylight","🌅","Light until "+(c.sunset?fmtHour(c.sunset):"—")); }
+  return items;
+}
 function renderCrewSummary(s,spot){
-  const rowAct=ACTS.find(a=>a.key==="row");
-  const rs=rowAct?rowAct.score(COND,spot):{lv:"good"};
-  const cw=coldWater(COND.waterF), fg=fogStatus(COND.visMi);
-  let lv=rs.lv;
-  if(fg&&fg.lv==="poor"&&lv!=="storm")lv="poor";
-  const heads={good:"Good to row",fair:"Row with caution",poor:"Not advisable — too rough",storm:"Off the water — thunderstorms"};
+  const items=crewItems(COND);
+  const worst=items.reduce((m,it)=>Math.max(m,RANK[it.lv]),0);
+  const lv=["good","fair","poor","storm"][Math.min(worst,3)];
+  let head;
+  if(items.some(i=>i.lv==="storm")) head="Off the water — thunderstorms";
+  else if(lv==="poor"){
+    const prio=["daylight","visibility","wind","water","gusts","coldwater"];
+    const drv=prio.map(k=>items.find(i=>i.key===k&&i.lv==="poor")).find(Boolean);
+    const k=drv?drv.key:"";
+    head = k==="daylight" ? "Wait for daylight — too dark now"
+         : k==="visibility" ? "Not advisable — fog / low visibility"
+         : k==="coldwater" ? "Cold water — take cold-water precautions"
+         : "Not advisable — too rough";
+  } else if(lv==="fair") head="Row with caution";
+  else head="Good to row";
   s.className="summary lv-"+lv;
   const dir=compass(COND.windDir), flags=[];
+  const cw=coldWater(COND.waterF), fg=fogStatus(COND.visMi);
   if(cw&&cw.lv!=="good")flags.push(cw.lv==="poor"?"cold water "+round(COND.waterF)+"°":"cool water "+round(COND.waterF)+"°");
   if(fg&&fg.lv!=="good")flags.push(fg.lv==="poor"?"dense fog":"fog risk");
-  if(!COND.isDay)flags.push("before sunrise / after sunset");
+  if(!COND.isDay)flags.push("dark now");
   const trend=windTrend();
   s.innerHTML=`<div class="pill">OBCR crew conditions</div>`+
-    `<div class="headline">${heads[lv]}</div>`+
+    `<div class="headline">${head}</div>`+
     `<div class="line">Wind <b>${round(COND.windMph)} mph ${dir}</b>, gusting <b>${round(COND.gustMph)}</b> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
     (trend?`<div class="line">${trend}</div>`:"");
 }
 function renderCrew(a){
-  const c=COND, items=[];
-  const add=(lv,label,ico,why)=>items.push({lv,label,ico,why});
-  if(c.windMph>16)add("poor","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — too rough for shells");
-  else if(c.windMph>10)add("fair","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — chop building");
-  else add("good","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — light");
-  if(c.gustMph>23)add("poor","Gusts","🌬️",round(c.gustMph)+" mph — dangerous puffs");
-  else if(c.gustMph>17)add("fair","Gusts","🌬️",round(c.gustMph)+" mph — watch the puffs");
-  else add("good","Gusts","🌬️",round(c.gustMph)+" mph");
-  if(c.windMph>16)add("poor","Water surface","🌊","Whitecaps / rough water");
-  else if(c.windMph>11)add("fair","Water surface","🌊","Chop building");
-  else add("good","Water surface","🌊","Calm — good set");
-  const cw=coldWater(c.waterF); if(cw)add(cw.lv,"Cold water","🥶",cw.msg);
-  const fg=fogStatus(c.visMi); if(fg)add(fg.lv,"Visibility","🌫️",fg.msg);
-  if(isStorm(c.code))add("storm","Lightning","⛈️","Thunderstorms — off the water now");
-  else add("good","Lightning","⛈️","No storms nearby");
-  if(!c.isDay)add("poor","Daylight","🌅","Dark — outside sunrise–sunset");
-  else { const toSet=c.sunset?(c.sunset-new Date())/60000:999;
-    if(toSet<30&&toSet>=0)add("fair","Daylight","🌅","Sunset ~"+fmtHour(c.sunset)+" — little light left");
-    else add("good","Daylight","🌅","Light until "+(c.sunset?fmtHour(c.sunset):"—")); }
-  const lab={good:"OK",fair:"Caution",poor:"No-go",storm:"Stop"};
+  const items=crewItems(COND), lab={good:"OK",fair:"Caution",poor:"No-go",storm:"Stop"};
   a.innerHTML=items.map(it=>`<div class="act ${it.lv}"><div class="top"><div class="name"><span class="ico">${it.ico}</span>${it.label}</div>`+
     `<div class="rate">${lab[it.lv]}</div></div><div class="why">${it.why}</div></div>`).join("");
 }
@@ -499,7 +522,7 @@ function renderActs(){
   if(CFG.crew){ renderCrew(a); return; }
   const spot=CFG.spots[ACTIVE];
   const list=activeActs(spot);
-  a.innerHTML=list.map(act=>{const r=act.score(COND,spot);const lab={good:"Good",fair:"Fair",poor:"Poor",storm:"No"}[r.lv];
+  a.innerHTML=list.map(act=>{const r=scoreAct(act,COND,spot);const lab={good:"Good",fair:"Fair",poor:"Poor",storm:"No"}[r.lv];
     return `<div class="act ${r.lv}"><div class="top"><div class="name"><span class="ico">${act.ico}</span>${act.label}</div>`+
       `<div class="rate">${lab}</div></div><div class="why">${r.why}</div></div>`;}).join("");
 }
