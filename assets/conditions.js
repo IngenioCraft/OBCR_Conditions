@@ -337,6 +337,7 @@ function skeleton(){
   w.appendChild(rad);
   w.appendChild(section("sec-tides","Tides","Tides"));
   w.appendChild(el("div","tides")).id="tides";
+  if(CFG.astro){ w.appendChild(section("sec-sky","Sky · moon, meteors &amp; rainbows","Sky")); w.appendChild(el("div","wq")).id="astro"; }
   w.appendChild(el("div","note",(CFG.footNote||"")+
     "<br><br>Activity ratings are automated guidance from weather &amp; marine models to help you plan — not a substitute for lifeguards, posted flags, official advisories, or your own judgment on the day."));
   w.appendChild(el("footer",null,sourcesHtml()));
@@ -382,7 +383,7 @@ async function loadActive(){
   renderSummary(); renderCards(); renderActs(); renderForecast(currentMode()); renderWQ();
   if(CFG.ferry)renderFerry();
   if(CFG.fishing)renderFishing(); if(CFG.shellfish)renderShellfish();
-  renderTides(); loadRadar();
+  renderTides(); if(CFG.astro)renderAstro(); loadRadar();
   const diag=$("#diag");
   if(fails.length){diag.style.display="block";
     diag.innerHTML="<b>Some live data didn't load.</b> If you're viewing this in a preview pane, that's expected — external data is blocked there and it works once hosted or opened directly in a browser. Details: "+[...new Set(fails)].join("; ")+".";}
@@ -783,6 +784,82 @@ function pickAttrs(a){
   return show.length?show.join(" · "):"See the DEC map below for closure details.";
 }
 
+/* ============================================================
+   Astronomy — moon phase, meteor showers, rainbow watch (all computed locally)
+   ============================================================ */
+function moonPhase(date){
+  const syn=29.530588853, ref=Date.UTC(2000,0,6,18,14)/86400000, nowd=date.getTime()/86400000;
+  let age=(nowd-ref)%syn; if(age<0)age+=syn; const frac=age/syn, illum=Math.round((1-Math.cos(2*Math.PI*frac))/2*100);
+  let name,emoji;
+  if(frac<0.03||frac>0.97){name="New moon";emoji="🌑";}
+  else if(frac<0.22){name="Waxing crescent";emoji="🌒";}
+  else if(frac<0.28){name="First quarter";emoji="🌓";}
+  else if(frac<0.47){name="Waxing gibbous";emoji="🌔";}
+  else if(frac<0.53){name="Full moon";emoji="🌕";}
+  else if(frac<0.72){name="Waning gibbous";emoji="🌖";}
+  else if(frac<0.78){name="Last quarter";emoji="🌗";}
+  else {name="Waning crescent";emoji="🌘";}
+  const dFull=((0.5-frac+1)%1)*syn, dNew=((1-frac)%1)*syn;
+  return {name,emoji,illum,nextFull:new Date(date.getTime()+dFull*86400000),nextNew:new Date(date.getTime()+dNew*86400000)};
+}
+function sunPos(date,lat,lon){
+  const rad=Math.PI/180, d=date.getTime()/86400000+2440587.5-2451545.0;
+  const g=(357.529+0.98560028*d)%360, q=(280.459+0.98564736*d)%360;
+  const L=(q+1.915*Math.sin(g*rad)+0.020*Math.sin(2*g*rad))%360, e=23.439-0.00000036*d;
+  const dec=Math.asin(Math.sin(e*rad)*Math.sin(L*rad))/rad;
+  let RA=Math.atan2(Math.cos(e*rad)*Math.sin(L*rad),Math.cos(L*rad))/rad; RA=(RA+360)%360;
+  let GMST=(18.697374558+24.06570982441908*d)%24; if(GMST<0)GMST+=24;
+  let LST=(GMST*15+lon)%360; if(LST<0)LST+=360;
+  let HA=LST-RA; HA=((HA+540)%360)-180;
+  const latR=lat*rad,decR=dec*rad,HAr=HA*rad;
+  const alt=Math.asin(Math.sin(latR)*Math.sin(decR)+Math.cos(latR)*Math.cos(decR)*Math.cos(HAr))/rad;
+  let az=Math.atan2(Math.sin(HAr),Math.cos(HAr)*Math.sin(latR)-Math.tan(decR)*Math.cos(latR))/rad; az=(az+180)%360;
+  return {alt,az};
+}
+const METEORS=[
+  {name:"Quadrantids",from:"12-28",to:"01-12",peak:"01-03",zhr:110,dir:"NE"},
+  {name:"Lyrids",from:"04-16",to:"04-25",peak:"04-22",zhr:18,dir:"E"},
+  {name:"Eta Aquariids",from:"04-19",to:"05-28",peak:"05-06",zhr:50,dir:"E"},
+  {name:"Delta Aquariids",from:"07-12",to:"08-23",peak:"07-30",zhr:25,dir:"S"},
+  {name:"Perseids",from:"07-17",to:"08-24",peak:"08-12",zhr:100,dir:"NE"},
+  {name:"Orionids",from:"10-02",to:"11-07",peak:"10-21",zhr:20,dir:"SE"},
+  {name:"Leonids",from:"11-06",to:"11-30",peak:"11-17",zhr:15,dir:"E"},
+  {name:"Geminids",from:"12-04",to:"12-17",peak:"12-14",zhr:130,dir:"E"},
+  {name:"Ursids",from:"12-17",to:"12-26",peak:"12-22",zhr:10,dir:"N"}
+];
+function meteorNow(date,illum){
+  const t=todayMD();
+  const active=METEORS.filter(m=>inRange(t,m.from,m.to)).sort((a,b)=>b.zhr-a.zhr);
+  if(active.length){const m=active[0];
+    const moon=illum>60?` A bright moon (${illum}% lit) will wash out fainter ones.`:` Skies are fairly moon-dark — good for faint meteors.`;
+    return `<b>${m.name}</b> active — ${t===m.peak?"<b>peaking tonight</b>":"peak "+fmtMD(m.peak)} (up to ~${m.zhr}/hr at peak). Best after midnight; look toward the ${m.dir}.${moon}`;
+  }
+  const y=date.getFullYear(); let best=null,bd=1e9;
+  METEORS.forEach(m=>{const p=m.peak.split("-"); let dt=new Date(y,+p[0]-1,+p[1]); if(dt<date)dt=new Date(y+1,+p[0]-1,+p[1]); const dd=(dt-date)/86400000; if(dd<bd){bd=dd;best=m;}});
+  return best&&bd<40?`No shower active now. Next: <b>${best.name}</b>, peak ${fmtMD(best.peak)}.`:"No major meteor shower active right now.";
+}
+function rainbowChance(spot){
+  if(!COND)return "—";
+  const sp=sunPos(new Date(),spot.lat,spot.lon);
+  if(!COND.isDay||sp.alt<0)return "Unlikely — the sun isn't up. Rainbows need sunlight low in the sky.";
+  if(sp.alt>42)return `Unlikely right now — the sun is high (${round(sp.alt)}° up). Best odds are within ~2 hrs of sunrise or sunset, when the sun drops below 42°.`;
+  const code=COND.code, showery=[51,53,55,61,63,65,80,81,82,95,96,99].includes(code);
+  const recent=COND.recentRainIn!=null&&COND.recentRainIn>0.02;
+  const look=compass((sp.az+180)%360);
+  if(showery)return `<b>Good chance</b> — the sun is low (${round(sp.alt)}°) with showers around. Look toward the <b>${look}</b> (opposite the sun).`;
+  if(recent)return `<b>Possible</b> — it rained recently and the sun is low (${round(sp.alt)}°). If the sun breaks through, look toward the <b>${look}</b>.`;
+  return `Low — the sun is nicely low (${round(sp.alt)}°) but there's no rain about. If a shower passes while the sun stays out, look toward the <b>${look}</b>.`;
+}
+function renderAstro(){
+  const box=$("#astro"); if(!box)return; const spot=CFG.spots[ACTIVE], now=new Date();
+  const mp=moonPhase(now), fd=d=>d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  box.innerHTML=
+    `<div class="astromoon"><span class="mE">${mp.emoji}</span><div><div class="status good" style="color:var(--brand)">${mp.name} · ${mp.illum}% lit</div>`+
+    `<div class="detail">Next full moon ${fd(mp.nextFull)} · new moon ${fd(mp.nextNew)}.</div></div></div>`+
+    `<div class="detail" style="margin-top:12px"><b>🌈 Rainbow watch:</b> ${rainbowChance(spot)}</div>`+
+    `<div class="detail" style="margin-top:10px"><b>☄️ Meteor showers:</b> ${meteorNow(now,mp.illum)}</div>`+
+    `<div class="detail" style="margin-top:10px;font-style:italic">Computed locally from the date &amp; sun angle — meteor peaks are approximate; a stargazing app has exact rise/set times.</div>`;
+}
 function renderTides(){
   const t=$("#tides"); const ev=DATA&&DATA.tideEvents;
   if(!ev||!ev.length){t.innerHTML="<span class='err'>Tide data unavailable.</span>";return;}

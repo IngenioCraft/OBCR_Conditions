@@ -120,6 +120,8 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 .wq .status{font-weight:700;font-size:1.02rem;margin-bottom:4px}
 .wq .status.good{color:var(--good)} .wq .status.fair{color:var(--fair)} .wq .status.poor{color:var(--poor)}
 .wq .detail{font-size:.85rem;color:var(--muted)}
+.astromoon{display:flex;align-items:center;gap:13px}
+.astromoon .mE{font-size:2.3rem;line-height:1}
 .wq a{font-weight:600}
 
 /* radar + tides */
