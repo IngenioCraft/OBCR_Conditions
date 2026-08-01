@@ -59,7 +59,7 @@ function fogStatus(mi){ if(mi==null)return null;
    ============================================================ */
 function lvFromRank(r){return ["good","fair","poor","storm"][Math.min(r,3)];}
 const ACTS=[
- {key:"swim",label:"Swim",ico:"🏊",needs:s=>true,score:(c)=>{
+ {key:"swim",label:"Swim",ico:"🏊",needs:s=>true,score:(c,spot)=>{
     if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms — out of the water."};
     if(c.wq&&c.wq.lv==="poor")return{lv:"poor",why:"Water-quality caution after recent rain (see below)."};
     let r=0, w=[];
@@ -70,6 +70,9 @@ const ACTS=[
       else if(c.waveFt>T.swimWaveFair){r=Math.max(r,1);w.push("chop "+round(c.waveFt,1)+"ft");}}
     if(c.wq&&c.wq.lv==="fair"){r=Math.max(r,1);w.push("some runoff risk");}
     if(c.uv!=null&&c.uv>=T.uvHigh)w.push("UV "+round(c.uv)+" — cover up / reef-safe SPF");
+    if(spot&&spot.lifeguard){ const lg=lifeguardStatus(spot);
+      if(lg.onDuty) w.push("🛟 lifeguards on duty till "+lg.closeStr);
+      else { r=Math.max(r,1); w.push(lg.inSeason?"no lifeguard on duty now — swim with care":"no lifeguards (off season) — swim with care"); } }
     return{lv:lvFromRank(r),why:w.join(", ")||"Looks swimmable."};}},
 
  {key:"surf",label:"Surf",ico:"🏄",needs:s=>s.surf,score:(c)=>{
@@ -162,8 +165,10 @@ const ACTS=[
     if(c.uv!=null&&c.uv>=T.uvHigh){const b=uvBurn(c.uv);w.push("high UV "+round(c.uv)+(b?", burns in ~"+b+" min":"")+" — "+uvProtect(c.uv));}
     return{lv:lvFromRank(r),why:w.join(", ")};}},
 
- {key:"kite",label:"Fly a kite",ico:"🪁",needs:s=>true,score:(c)=>{
+ {key:"kite",label:"Fly a kite",ico:"🪁",needs:s=>true,score:(c,spot)=>{
     if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms — no kites."};
+    if(spot&&spot.lifeguard){ const lg=lifeguardStatus(spot);
+      if(lg.onDuty) return{lv:"poor",why:"not while lifeguards are on duty — the beach is busy till "+lg.closeStr+". Fly a kite after that."}; }
     let r=0,w=[];
     if(c.windMph<T.kiteWindMin){r=2;w.push("too calm "+round(c.windMph)+" mph");}
     else if(c.windMph>T.kiteWindPoor){r=2;w.push("too strong "+round(c.windMph)+" mph");}
@@ -544,6 +549,7 @@ function renderActs(){
   let h=list.map(act=>{const r=scoreAct(act,COND,spot);const lab={good:"Good",fair:"Fair",poor:"Poor",storm:"No"}[r.lv];
     return `<div class="act ${r.lv}"><div class="top"><div class="name"><span class="ico">${act.ico}</span>${act.label}</div>`+
       `<div class="rate">${lab}</div></div><div class="why">${r.why}</div></div>`;}).join("");
+  if(spot.lifeguard) h+=lifeguardPillHTML(spot);
   if(CFG.funPills) h+=CFG.funPills.map(p=>`<div class="act ${p.lv||'good'}"><div class="top"><div class="name"><span class="ico">${p.ico}</span>${p.label}</div>`+
     `<div class="rate">${p.rate}</div></div><div class="why">${p.why||''}</div></div>`).join("");
   if(CFG.venues) h+=CFG.venues.map(venuePillHTML).join("");
@@ -692,6 +698,30 @@ function dowET(){const wd=new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"
   return {Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[wd];}
 function toMin(t){const p=t.split(":");return (+p[0])*60+(+p[1]);}
 function fmt12(t){let p=t.split(":"),h=+p[0],m=+p[1];const ap=h>=12?"PM":"AM";h=h%12||12;return h+":"+pad2(m)+" "+ap;}
+/* ---- lifeguards (config-driven schedule, tied to swim + kite) ---- */
+function lifeguardStatus(spot){
+  const lg=spot&&spot.lifeguard; if(!lg)return{has:false};
+  const t=todayMD(), dow=dowET(), nm=nowMinET();
+  let period=null; (lg.periods||[]).forEach(p=>{ if(inRange(t,p.from,p.to)) period=p; });
+  const out={has:true, station:lg.station||"", source:lg.source||"", inSeason:!!period, onDuty:false, todayHrs:null, pre:false, after:false};
+  if(period){ const hrs=period.hours&&period.hours[dow];
+    if(hrs){ out.todayHrs=hrs; const o=toMin(hrs[0]),c=toMin(hrs[1]);
+      out.openStr=fmt12(hrs[0]); out.closeStr=fmt12(hrs[1]);
+      if(nm>=o&&nm<c) out.onDuty=true; else if(nm<o) out.pre=true; else out.after=true; } }
+  return out;
+}
+function lifeguardPillHTML(spot){
+  const lg=lifeguardStatus(spot); if(!lg.has)return"";
+  let lv="none",rate="Off duty",why;
+  if(lg.onDuty){ lv="good"; rate="On duty"; why=`on the beach till ${lg.closeStr}${lg.station?" · "+lg.station:""} 🛟`; }
+  else if(lg.pre){ why=`on duty ${lg.openStr}–${lg.closeStr} today`; }
+  else if(lg.after){ why=`done for today — back tomorrow`; }
+  else if(lg.inSeason){ why=`no guards scheduled today`; }
+  else { rate="Off season"; why=`beach guards return Memorial Day weekend`; }
+  const src=lg.source?` <a href="${lg.source}" target="_blank" rel="noopener" style="color:var(--muted);font-size:.9em">schedule ↗</a>`:"";
+  return `<div class="act ${lv}"><div class="top"><div class="name"><span class="ico">🛟</span>Lifeguard</div>`+
+    `<div class="rate">${rate}</div></div><div class="why">${why}${src}</div></div>`;
+}
 function nextDeps(list,now,k){
   const mins=(list||[]).map(t=>({t,m:toMin(t)})).sort((a,b)=>a.m-b.m);
   let up=mins.filter(x=>x.m>=now).slice(0,k), wrapped=false;
