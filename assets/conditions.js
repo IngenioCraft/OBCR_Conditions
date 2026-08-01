@@ -491,8 +491,10 @@ function renderCrewSummary(s,spot){
 }
 function renderCrew(a){
   const items=crewItems(COND), lab={good:"OK",fair:"Caution",poor:"No-go",storm:"Stop"};
-  a.innerHTML=items.map(it=>`<div class="act ${it.lv}"><div class="top"><div class="name"><span class="ico">${it.ico}</span>${it.label}</div>`+
+  let h=items.map(it=>`<div class="act ${it.lv}"><div class="top"><div class="name"><span class="ico">${it.ico}</span>${it.label}</div>`+
     `<div class="rate">${lab[it.lv]}</div></div><div class="why">${it.why}</div></div>`).join("");
+  if(CFG.astro) h+=rainbowPillHTML();
+  a.innerHTML=h;
 }
 function renderCards(){
   const g=$("#grid"); if(!COND){g.innerHTML="<span class='err'>Unavailable.</span>";return;}
@@ -523,9 +525,11 @@ function renderActs(){
   if(CFG.crew){ renderCrew(a); return; }
   const spot=CFG.spots[ACTIVE];
   const list=activeActs(spot);
-  a.innerHTML=list.map(act=>{const r=scoreAct(act,COND,spot);const lab={good:"Good",fair:"Fair",poor:"Poor",storm:"No"}[r.lv];
+  let h=list.map(act=>{const r=scoreAct(act,COND,spot);const lab={good:"Good",fair:"Fair",poor:"Poor",storm:"No"}[r.lv];
     return `<div class="act ${r.lv}"><div class="top"><div class="name"><span class="ico">${act.ico}</span>${act.label}</div>`+
       `<div class="rate">${lab}</div></div><div class="why">${r.why}</div></div>`;}).join("");
+  if(CFG.astro) h+=rainbowPillHTML();
+  a.innerHTML=h;
 }
 
 function stripLv(w,g,code){ if(isStorm(code))return"storm"; if(w>16||g>23)return"poor"; if(w>10||g>17)return"fair"; return"good"; }
@@ -838,17 +842,22 @@ function meteorNow(date,illum){
   METEORS.forEach(m=>{const p=m.peak.split("-"); let dt=new Date(y,+p[0]-1,+p[1]); if(dt<date)dt=new Date(y+1,+p[0]-1,+p[1]); const dd=(dt-date)/86400000; if(dd<bd){bd=dd;best=m;}});
   return best&&bd<40?`No shower active now. Next: <b>${best.name}</b>, peak ${fmtMD(best.peak)}.`:"No major meteor shower active right now.";
 }
-function rainbowChance(spot){
-  if(!COND)return "—";
-  const sp=sunPos(new Date(),spot.lat,spot.lon);
-  if(!COND.isDay||sp.alt<0)return "Unlikely — the sun isn't up. Rainbows need sunlight low in the sky.";
-  if(sp.alt>42)return `Unlikely right now — the sun is high (${round(sp.alt)}° up). Best odds are within ~2 hrs of sunrise or sunset, when the sun drops below 42°.`;
-  const code=COND.code, showery=[51,53,55,61,63,65,80,81,82,95,96,99].includes(code);
-  const recent=COND.recentRainIn!=null&&COND.recentRainIn>0.02;
-  const look=compass((sp.az+180)%360);
-  if(showery)return `<b>Good chance</b> — the sun is low (${round(sp.alt)}°) with showers around. Look toward the <b>${look}</b> (opposite the sun).`;
-  if(recent)return `<b>Possible</b> — it rained recently and the sun is low (${round(sp.alt)}°). If the sun breaks through, look toward the <b>${look}</b>.`;
-  return `Low — the sun is nicely low (${round(sp.alt)}°) but there's no rain about. If a shower passes while the sun stays out, look toward the <b>${look}</b>.`;
+function rainbowStatus(spot){
+  const out={lv:"none",label:"Unlikely",why:"—",full:"—"};
+  if(!COND)return out;
+  const sp=sunPos(new Date(),spot.lat,spot.lon), look=compass((sp.az+180)%360);
+  if(!COND.isDay||sp.alt<0){out.why="sun isn't up";out.full="Unlikely — the sun isn't up. Rainbows need sunlight low in the sky.";return out;}
+  if(sp.alt>42){out.why="sun too high ("+round(sp.alt)+"°)";out.full=`Unlikely right now — the sun is high (${round(sp.alt)}° up). Best odds are within ~2 hrs of sunrise or sunset, when the sun drops below 42°.`;return out;}
+  const code=COND.code, showery=[51,53,55,61,63,65,80,81,82,95,96,99].includes(code), recent=COND.recentRainIn!=null&&COND.recentRainIn>0.02;
+  if(showery){out.lv="good";out.label="Likely";out.why="sun low + showers — look "+look;out.full=`<b>Good chance</b> — the sun is low (${round(sp.alt)}°) with showers around. Look toward the <b>${look}</b> (opposite the sun).`;return out;}
+  if(recent){out.lv="fair";out.label="Maybe";out.why="rained recently — watch "+look;out.full=`<b>Possible</b> — it rained recently and the sun is low (${round(sp.alt)}°). If the sun breaks through, look toward the <b>${look}</b>.`;return out;}
+  out.why="no rain about; sun low ("+round(sp.alt)+"°)";out.full=`Low — the sun is nicely low (${round(sp.alt)}°) but there's no rain about. If a shower passes while the sun stays out, look toward the <b>${look}</b>.`;
+  return out;
+}
+function rainbowPillHTML(){
+  const rb=rainbowStatus(CFG.spots[ACTIVE]);
+  return `<div class="act ${rb.lv}"><div class="top"><div class="name"><span class="ico">🌈</span>Rainbow</div>`+
+    `<div class="rate">${rb.label}</div></div><div class="why">${rb.why}</div></div>`;
 }
 function renderAstro(){
   const box=$("#astro"); if(!box)return; const spot=CFG.spots[ACTIVE], now=new Date();
@@ -856,7 +865,7 @@ function renderAstro(){
   box.innerHTML=
     `<div class="astromoon"><span class="mE">${mp.emoji}</span><div><div class="status good" style="color:var(--brand)">${mp.name} · ${mp.illum}% lit</div>`+
     `<div class="detail">Next full moon ${fd(mp.nextFull)} · new moon ${fd(mp.nextNew)}.</div></div></div>`+
-    `<div class="detail" style="margin-top:12px"><b>🌈 Rainbow watch:</b> ${rainbowChance(spot)}</div>`+
+    `<div class="detail" style="margin-top:12px"><b>🌈 Rainbow watch:</b> ${rainbowStatus(spot).full}</div>`+
     `<div class="detail" style="margin-top:10px"><b>☄️ Meteor showers:</b> ${meteorNow(now,mp.illum)}</div>`+
     `<div class="detail" style="margin-top:10px;font-style:italic">Computed locally from the date &amp; sun angle — meteor peaks are approximate; a stargazing app has exact rise/set times.</div>`;
 }
