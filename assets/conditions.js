@@ -208,7 +208,7 @@ async function fetchSpot(spot){
     "&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index"+
     "&minutely_15=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code"+
     "&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index,visibility"+
-    "&daily=sunrise,sunset,uv_index_max,precipitation_sum&timeformat=unixtime&past_days=1&forecast_days=2"+
+    "&daily=sunrise,sunset,uv_index_max,precipitation_sum&timeformat=unixtime&past_days=1&forecast_days=3"+
     "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone="+encodeURIComponent(TZ);
   const aqU="https://air-quality-api.open-meteo.com/v1/air-quality?latitude="+lat+"&longitude="+lon+
     "&current=us_aqi&timezone="+encodeURIComponent(TZ);
@@ -320,7 +320,7 @@ function skeleton(){
   w.appendChild(section("sec-forecast","Through the day","Forecast"));
   w.appendChild(el("p","h2note","Blocks are colored by how good conditions are — watch which way the colors trend."));
   const tg=el("div","toggle"); tg.id="toggle";
-  tg.innerHTML='<button data-mode="hourly" class="on">Rest of today · hourly</button><button data-mode="q15">Next 3 hrs · 15 min</button>';
+  tg.innerHTML='<button data-mode="q15">Next 3 hrs · 15 min</button><button data-mode="hourly" class="on">Next 12 hrs</button><button data-mode="h48">Next 48 hrs</button>';
   w.appendChild(tg);
   const stripEl=el("div","strip"); stripEl.id="strip"; stripEl.tabIndex=0;
   stripEl.setAttribute("role","group"); stripEl.setAttribute("aria-label","Hourly forecast — scroll horizontally with arrow keys"); w.appendChild(stripEl);
@@ -505,16 +505,21 @@ function renderActs(){
 function renderStrip(mode){
   const strip=$("#strip"); const wx=DATA&&DATA.wx; if(!wx){strip.innerHTML="<div class='err' style='padding:8px'>Forecast unavailable.</div>";return;}
   const src=mode==="q15"&&wx.minutely_15?wx.minutely_15:wx.hourly;
+  const count=mode==="q15"?12:mode==="h48"?48:12;
   const now=Date.now(); let s=src.time.findIndex(t=>t*1000>=now); if(s<0)s=0;
   const H=wx.hourly;
   function popAt(ts){if(!H.precipitation_probability)return null;let idx=0;for(let i=0;i<H.time.length;i++){if(H.time[i]<=ts)idx=i;else break;}return H.precipitation_probability[idx];}
-  let html="";
-  for(let i=s;i<s+12&&i<src.time.length;i++){
+  const wkday=d=>new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(d);
+  let html="",lastDay=null;
+  for(let i=s;i<s+count&&i<src.time.length;i++){
     const ts=src.time[i],d=new Date(ts*1000);const w=src.wind_speed_10m[i],g=src.wind_gusts_10m[i],code=src.weather_code?src.weather_code[i]:0;
     // color by simple wind/gust/storm rowability
     let lv="good"; if(isStorm(code))lv="storm"; else if(w>16||g>23)lv="poor"; else if(w>10||g>17)lv="fair";
     const pop=popAt(ts);
-    html+=`<div class="hour ${lv}"><div class="t">${mode==="q15"?fmtHM(d):fmtHour(d)}</div>`+
+    const day=wkday(d), showDay=(mode!=="q15")&&day!==lastDay; lastDay=day;
+    html+=`<div class="hour ${lv}">`+
+      (mode!=="q15"?`<div class="day">${showDay?day:"&nbsp;"}</div>`:``)+
+      `<div class="t">${mode==="q15"?fmtHM(d):fmtHour(d)}</div>`+
       `<div class="temp">${round(src.temperature_2m[i])}°</div>`+
       `<div class="wind">${round(w)} <span style="color:var(--muted);font-weight:400">${compass(src.wind_direction_10m?src.wind_direction_10m[i]:null)}</span></div>`+
       `<div class="gust">gust ${round(g)}</div>`+
