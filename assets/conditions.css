@@ -75,6 +75,7 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 .act .rate{flex:0 0 auto;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:20px;color:#fff}
 .act.good .rate{background:var(--good)} .act.fair .rate{background:var(--fair)}
 .act.poor .rate{background:var(--poor)} .act.storm .rate{background:var(--storm)}
+.act.none{border-left-color:var(--brand-2)} .act.none .rate{background:var(--muted)}
 .act .why{font-size:.8rem;color:var(--muted);margin-top:6px}
 
 /* forecast strip */
