@@ -76,6 +76,18 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 .act.good .rate{background:var(--good)} .act.fair .rate{background:var(--fair)}
 .act.poor .rate{background:var(--poor)} .act.storm .rate{background:var(--storm)}
 .act.none{border-left-color:var(--brand-2)} .act.none .rate{background:var(--muted)}
+
+/* rainbow splash (fires once on load when a rainbow is Likely) */
+.rb-splash{position:fixed;left:0;top:0;width:100%;height:360px;pointer-events:none;z-index:9999;opacity:1;transition:opacity .8s ease}
+.rb-splash.out{opacity:0}
+.rb-splash svg{width:100%;height:100%;display:block}
+.rb-splash path{stroke-dasharray:1400;stroke-dashoffset:1400;animation:rbdraw 1.15s cubic-bezier(.4,.9,.3,1) forwards}
+@keyframes rbdraw{to{stroke-dashoffset:0}}
+.act.rb-glow{animation:rbglow 2.6s ease}
+@keyframes rbglow{0%{box-shadow:var(--shadow)}12%{box-shadow:0 0 0 5px rgba(241,196,15,.55),0 10px 28px rgba(241,196,15,.6)}55%{box-shadow:0 0 0 3px rgba(241,196,15,.3),0 8px 22px rgba(241,196,15,.4)}100%{box-shadow:var(--shadow)}}
+.rb-spark{position:fixed;pointer-events:none;z-index:10000;font-size:1.15rem;animation:rbspark 1.5s ease forwards}
+@keyframes rbspark{0%{opacity:0;transform:translateY(6px) scale(.5) rotate(0)}25%{opacity:1}100%{opacity:0;transform:translateY(-30px) scale(1.15) rotate(25deg)}}
+@media (prefers-reduced-motion: reduce){.rb-splash{display:none}.act.rb-glow{animation:none;box-shadow:0 0 0 4px rgba(241,196,15,.5)}}
 .act .why{font-size:.8rem;color:var(--muted);margin-top:6px}
 
 /* forecast strip */
