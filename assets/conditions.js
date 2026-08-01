@@ -196,7 +196,22 @@ const ACTS=[
       else if(c.airF<52){r=Math.max(r,2);w.push("chilly "+round(c.airF)+"°");}}
     if(c.gustMph>25){r=Math.max(r,1);w.push("gusty");}
     if(c.sunset)w.push("sunset "+fmtHour(c.sunset));
-    return{lv:lvFromRank(r),why:w.join(", ")};}}
+    return{lv:lvFromRank(r),why:w.join(", ")};}},
+
+ {key:"bike",label:"Bike ride",ico:"🚴",needs:s=>true,score:(c)=>{
+    if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms — off the road."};
+    let r=0,w=[];
+    if(c.precipProb!=null&&c.precipProb>60){r=2;w.push("wet roads likely "+round(c.precipProb)+"%");}
+    else if(c.precipProb!=null&&c.precipProb>35){r=1;w.push("watch for showers "+round(c.precipProb)+"%");}
+    if(c.airF!=null){ if(c.airF>92){r=Math.max(r,1);w.push("hot "+round(c.airF)+"°");} else if(c.airF<38){r=Math.max(r,1);w.push("cold "+round(c.airF)+"°");}}
+    if(c.gustMph>26){r=Math.max(r,1);w.push("strong headwinds "+round(c.windMph)+" mph");}
+    return{lv:lvFromRank(r),why:w.join(", ")||"great for a ride"};}},
+
+ {key:"gamenight",label:"Family game night",ico:"🎲",needs:s=>true,score:(c)=>{
+    const rainy=(c.precipProb!=null&&c.precipProb>50)||[61,63,65,80,81,82].includes(c.code);
+    if(isStorm(c.code)||rainy)return{lv:"good",why:"wet out — perfect night to stay in 🎲"};
+    if(c.airF!=null&&c.airF<45)return{lv:"good",why:"chilly out — cozy games in"};
+    return{lv:"fair",why:"gorgeous out — save it for after dark"};}}
 ];
 
 /* ============================================================
@@ -389,11 +404,12 @@ async function loadActive(){
     diag.innerHTML="<b>Some live data didn't load.</b> If you're viewing this in a preview pane, that's expected — external data is blocked there and it works once hosted or opened directly in a browser. Details: "+[...new Set(fails)].join("; ")+".";}
   else diag.style.display="none";
   $("#updated").innerHTML='<span class="dot"></span>Updated '+fmtTime(new Date());
+  if(CFG.astro&&!_splashed){ const rb=rainbowStatus(CFG.spots[ACTIVE]); if(rb.lv==="good"){ _splashed=true; setTimeout(rainbowSplash,250); } }
 }
 function currentMode(){const on=$("#toggle")&&$("#toggle").querySelector(".on");return on?on.dataset.mode:"hourly";}
 
 /* how each activity behaves after dark: 'ok' = unaffected, 'caution' = cap at Fair, default = No after dark */
-const NIGHT={fish:"ok",beachwalk:"ok",party:"ok",boat:"caution",sail:"caution"};
+const NIGHT={fish:"ok",beachwalk:"ok",party:"ok",gamenight:"ok",boat:"caution",sail:"caution",bike:"caution"};
 function scoreAct(act,c,spot){
   let r=act.score(c,spot);
   if(!c.isDay && r.lv!=="storm"){
@@ -528,6 +544,9 @@ function renderActs(){
   let h=list.map(act=>{const r=scoreAct(act,COND,spot);const lab={good:"Good",fair:"Fair",poor:"Poor",storm:"No"}[r.lv];
     return `<div class="act ${r.lv}"><div class="top"><div class="name"><span class="ico">${act.ico}</span>${act.label}</div>`+
       `<div class="rate">${lab}</div></div><div class="why">${r.why}</div></div>`;}).join("");
+  if(CFG.funPills) h+=CFG.funPills.map(p=>`<div class="act ${p.lv||'good'}"><div class="top"><div class="name"><span class="ico">${p.ico}</span>${p.label}</div>`+
+    `<div class="rate">${p.rate}</div></div><div class="why">${p.why||''}</div></div>`).join("");
+  if(CFG.venues) h+=CFG.venues.map(venuePillHTML).join("");
   if(CFG.astro) h+=rainbowPillHTML();
   a.innerHTML=h;
 }
@@ -858,6 +877,44 @@ function rainbowPillHTML(){
   const rb=rainbowStatus(CFG.spots[ACTIVE]);
   return `<div class="act ${rb.lv}"><div class="top"><div class="name"><span class="ico">🌈</span>Rainbow</div>`+
     `<div class="rate">${rb.label}</div></div><div class="why">${rb.why}</div></div>`;
+}
+let _splashed=false;
+function rainbowSplash(){
+  if(typeof document==="undefined")return;
+  if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches){glowPill();return;}
+  document.querySelectorAll(".rb-splash").forEach(n=>n.remove());
+  const RB=["#e74c3c","#e67e22","#f1c40f","#2ecc71","#3498db","#3f51b5","#8e44ad"], cx=600,baseY=352,r0=336,step=18;
+  const paths=RB.map((c,i)=>{const r=r0-i*step;return `<path d="M ${cx-r} ${baseY} A ${r} ${r} 0 0 1 ${cx+r} ${baseY}" fill="none" stroke="${c}" stroke-width="15" stroke-linecap="round" style="animation-delay:${i*70}ms"/>`;}).join("");
+  const o=document.createElement("div"); o.className="rb-splash";
+  o.innerHTML=`<svg viewBox="0 0 1200 360" preserveAspectRatio="xMidYMin slice">${paths}</svg>`;
+  document.body.appendChild(o);
+  setTimeout(glowPill,1150); setTimeout(()=>o.classList.add("out"),2500); setTimeout(()=>o.remove(),3400);
+}
+function glowPill(){
+  const pill=[...document.querySelectorAll("#acts .act")].find(a=>{const n=a.querySelector(".name");return n&&/Rainbow/.test(n.textContent);});
+  if(!pill)return;
+  pill.classList.remove("rb-glow"); void pill.offsetWidth; pill.classList.add("rb-glow");
+  const r=pill.getBoundingClientRect();
+  ["✨","🪙","✨","🌟","🪙","✨"].forEach((e,i)=>{const s=document.createElement("div"); s.className="rb-spark"; s.textContent=e;
+    s.style.left=(r.left+8+Math.random()*Math.max(10,r.width-16))+"px"; s.style.top=(r.top+6+Math.random()*Math.max(8,r.height-14))+"px";
+    s.style.animationDelay=(i*90)+"ms"; document.body.appendChild(s); setTimeout(()=>s.remove(),1800);});
+  setTimeout(()=>{if(pill)pill.classList.remove("rb-glow");},2600);
+}
+/* venue pill — shows open/closed from local hours + season (e.g. a bakery in town) */
+function venuePillHTML(v){
+  const t=todayMD(), dow=dowET(), nm=nowMinET();
+  let lv="none",rate="Closed",why="";
+  const inSeason=!v.season||inRange(t,v.season.from,v.season.to);
+  if(!inSeason){ why="closed for the season"; }
+  else{ const hrs=v.hours&&v.hours[dow];
+    if(!hrs){ why="closed today"; }
+    else{ const o=toMin(hrs[0]),c=toMin(hrs[1]);
+      if(nm>=o&&nm<c){ lv="good"; rate="Open"; why=`open till ${fmt12(hrs[1])}${v.addr?" · "+v.addr:""} ${v.ico}`; }
+      else if(nm<o){ why=`opens ${fmt12(hrs[0])}${v.addr?" · "+v.addr:""}`; }
+      else { why=`closed for the night — opens ${fmt12(hrs[0])}`; } }
+  }
+  return `<div class="act ${lv}"><div class="top"><div class="name"><span class="ico">${v.ico}</span>${v.label}</div>`+
+    `<div class="rate">${rate}</div></div><div class="why">${why}</div></div>`;
 }
 function renderAstro(){
   const box=$("#astro"); if(!box)return; const spot=CFG.spots[ACTIVE], now=new Date();
