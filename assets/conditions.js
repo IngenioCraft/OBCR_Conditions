@@ -410,6 +410,19 @@ function skeleton(){
   w.appendChild(el("div","sparkkey",'<span><i style="background:#0b4f6c"></i>wind</span><span><i class="dash"></i>gusts</span><span><i style="background:var(--good)"></i>good</span><span><i style="background:var(--fair)"></i>fair</span><span><i style="background:var(--poor)"></i>rough</span><span><i style="background:#5fa8d3"></i>rain&nbsp;%</span><span>· tint = now→+3h</span>'));
   const stripEl=el("div","strip"); stripEl.id="strip"; stripEl.tabIndex=0;
   stripEl.setAttribute("role","group"); stripEl.setAttribute("aria-label","Forecast cards — scroll horizontally; hover a card to highlight it on the chart"); w.appendChild(stripEl);
+  if(CFG.windyWidget||CFG.sailflow){
+    w.appendChild(section("sec-windfc","Wind forecast — Windy &amp; SailFlow","Wind fc"));
+    w.appendChild(el("p","h2note","Detailed wind forecast tables for this spot (third-party widgets). Live wind above comes from the harbor station; these look further ahead."));
+    if(CFG.windyWidget){ const wy=CFG.windyWidget;
+      const d=el("div","windywidget"); d.setAttribute("data-windywidget","forecast"); d.setAttribute("data-spotid",wy.spotid); d.setAttribute("data-appid",wy.appid); w.appendChild(d);
+      const s=document.createElement("script"); s.async=true; s.src="https://windy.app/widget/windy_forecast_async.js"; w.appendChild(s);
+    }
+    if(CFG.sailflow){ const sf=CFG.sailflow;
+      const box=el("div","sailflow");
+      box.innerHTML=`<iframe src="https://widgets.sailflow.com/widgets/web/modelTable?spot_id=${sf.spotid}&units_wind=mph&units_temp=F" title="SailFlow wind forecast" loading="lazy"></iframe>`;
+      w.appendChild(box);
+    }
+  }
   if(CFG.ferry){ w.appendChild(section("sec-ferry","Ferries to Bay Shore","Ferries")); const fe=el("div"); fe.id="ferry"; w.appendChild(fe); }
   w.appendChild(section("sec-wq","Water quality","Water quality"));
   w.appendChild(el("div","wq")).id="wq";
