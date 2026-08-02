@@ -354,6 +354,10 @@ function deriveNow(data,spot){
       if(cond.gustMph!=null)cond.gustMph=cond.gustMph*(1-(1-f)*0.5);
       cond.windSheltered=true; cond.windFactor=f; }
   }
+  // human-readable wind source label (shown on the pills so the crew knows where the number came from)
+  cond.windLabel = cond.windSource==="live"
+    ? "live · "+(spot.windSourceName || (cond.windStations&&cond.windStations[0]) || "nearby harbor station")
+    : (cond.windSheltered ? "harbor-adjusted forecast model" : "forecast model");
   // water-quality assessment (rain runoff based)
   cond.wq=assessWQ(cond,spot);
   return cond;
@@ -555,13 +559,14 @@ function windTrend(){
 }
 
 function crewItems(c){
-  const items=[]; const add=(key,lv,label,ico,why)=>items.push({key,lv,label,ico,why});
-  if(c.windMph>16)add("wind","poor","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — too rough for shells");
-  else if(c.windMph>10)add("wind","fair","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — chop building");
-  else add("wind","good","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — light");
-  if(c.gustMph>23)add("gusts","poor","Gusts","🌬️",round(c.gustMph)+" mph — dangerous puffs");
-  else if(c.gustMph>17)add("gusts","fair","Gusts","🌬️",round(c.gustMph)+" mph — watch the puffs");
-  else add("gusts","good","Gusts","🌬️",round(c.gustMph)+" mph");
+  const items=[]; const add=(key,lv,label,ico,why,tag)=>items.push({key,lv,label,ico,why,tag});
+  const src=c.windLabel;
+  if(c.windMph>16)add("wind","poor","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — too rough for shells",src);
+  else if(c.windMph>10)add("wind","fair","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — chop building",src);
+  else add("wind","good","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — light",src);
+  if(c.gustMph>23)add("gusts","poor","Gusts","🌬️",round(c.gustMph)+" mph — dangerous puffs",src);
+  else if(c.gustMph>17)add("gusts","fair","Gusts","🌬️",round(c.gustMph)+" mph — watch the puffs",src);
+  else add("gusts","good","Gusts","🌬️",round(c.gustMph)+" mph",src);
   if(c.windMph>16)add("water","poor","Water surface","🌊","Whitecaps / rough water");
   else if(c.windMph>11)add("water","fair","Water surface","🌊","Chop building");
   else add("water","good","Water surface","🌊","Calm — good set");
@@ -600,13 +605,13 @@ function renderCrewSummary(s,spot){
   const trend=windTrend();
   s.innerHTML=`<div class="pill">OBCR crew conditions</div>`+
     `<div class="headline">${head}</div>`+
-    `<div class="line">Wind <b>${round(COND.windMph)} mph ${dir}</b>, gusting <b>${round(COND.gustMph)}</b> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
+    `<div class="line">Wind <b>${round(COND.windMph)} mph ${dir}</b>, gusting <b>${round(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
     (trend?`<div class="line">${trend}</div>`:"");
 }
 function renderCrew(a){
   const items=crewItems(COND), lab={good:"OK",fair:"Caution",poor:"No-go",storm:"Stop"};
   let h=items.map(it=>`<div class="act ${it.lv}"><div class="top"><div class="name"><span class="ico">${it.ico}</span>${it.label}</div>`+
-    `<div class="rate">${lab[it.lv]}</div></div><div class="why">${it.why}</div></div>`).join("");
+    `<div class="rate">${lab[it.lv]}</div></div><div class="why">${it.why}</div>${it.tag?`<div class="srctag">${it.tag==='live · '||/^live/.test(it.tag)?'🟢 ':''}${it.tag}</div>`:''}</div>`).join("");
   if(CFG.astro) h+=rainbowPillHTML();
   a.innerHTML=h;
 }
