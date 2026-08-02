@@ -938,8 +938,24 @@ function rainbowStatus(spot){
 }
 function rainbowPillHTML(){
   const rb=rainbowStatus(CFG.spots[ACTIVE]);
-  return `<div class="act ${rb.lv}"><div class="top"><div class="name"><span class="ico">🌈</span>Rainbow</div>`+
-    `<div class="rate">${rb.label}</div></div><div class="why">${rb.why}</div></div>`;
+  const url=CFG.rainbowSignup===false?null:(CFG.rainbowSignup||"signup.html");
+  // plain pill if signup is turned off
+  if(!url){
+    return `<div class="act ${rb.lv}"><div class="top"><div class="name"><span class="ico">🌈</span>Rainbow</div>`+
+      `<div class="rate">${rb.label}</div></div><div class="why">${rb.why}</div></div>`;
+  }
+  // combined bar: live status on the left, "text me" signup on the right
+  const pitch=rb.lv==="good"?"Get a text when a rainbow's likely"
+    :rb.lv==="fair"?"Get a heads-up when one's possible"
+    :"Be first to know next time";
+  return `<div class="act rainbar">`+
+    `<div class="rb-status"><div class="rb-top"><span class="ico">🌈</span>`+
+      `<span class="name">Rainbow</span><span class="rate lv-${rb.lv}">${rb.label}</span></div>`+
+      `<div class="why">${rb.why}</div></div>`+
+    `<div class="rb-sep"></div>`+
+    `<div class="rb-ask"><div class="rb-pitch"><b>${pitch}</b> — free, reply STOP anytime</div>`+
+      `<a class="rb-btn" href="${url}">Sign up →</a></div>`+
+    `</div>`;
 }
 let _splashed=false;
 function rainbowSplash(){
