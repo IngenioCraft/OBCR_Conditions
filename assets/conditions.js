@@ -442,6 +442,10 @@ function skeleton(){
   w.appendChild(el("p","h2note","NWS "+(CFG.radarStation||"KOKX")+" loop — your area is near the center."));
   const rad=el("div","radar"); rad.innerHTML='<img id="radar" alt="radar loop"><div class="cap" id="radarcap">Loading radar…</div>';
   w.appendChild(rad);
+  if(CFG.windMap){ w.appendChild(section("sec-windmap","Wind map","Wind map"));
+    w.appendChild(el("p","h2note","Live regional wind map (WindAlert) centered on the harbor. Drag to explore; the live wind above is from the Sagamore station."));
+    const wm=el("div","windmap"); wm.innerHTML=`<iframe src="${CFG.windMap}" title="Live wind map" loading="lazy" scrolling="no"></iframe>`; w.appendChild(wm);
+  }
   w.appendChild(section("sec-tides","Tides","Tides"));
   w.appendChild(el("div","tides")).id="tides";
   if(CFG.astro){ w.appendChild(section("sec-sky","Sky · moon, meteors &amp; rainbows","Sky")); w.appendChild(el("div","wq")).id="astro"; }
