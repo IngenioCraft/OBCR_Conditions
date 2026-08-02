@@ -32,6 +32,12 @@ async function getJSON(url){
 }
 const round=(v,n=0)=>v==null||isNaN(v)?null:Number(v).toFixed(n);
 const compass=d=>d==null||isNaN(d)?"":["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(d/22.5)%16];
+/* wind units — internal values are mph; display in the page's chosen unit (set CFG.windUnit:"kn"). */
+const KN=0.868976;
+const WUNIT=(CFG.windUnit==="kn"||CFG.windUnit==="knots")?"kn":"mph";
+const WUL=WUNIT;
+const wv=v=>(v==null||isNaN(+v))?v:(WUNIT==="kn"?(+v)*KN:+v);           // convert mph → display unit
+const wS=v=>{const x=wv(v); return (x==null||isNaN(x))?"—":String(Math.round(x));};  // display string
 const fmtTime=d=>d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ});
 const fmtHour=d=>d.toLocaleTimeString("en-US",{hour:"numeric",timeZone:TZ});
 const fmtHM=d=>d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:TZ});
@@ -439,7 +445,8 @@ function skeleton(){
         `<span class="ic">📹</span><span class="lt"><b>${lc.label||'Live camera'}</b>${lc.credit?`<span class="src">${lc.credit}</span>`:''}</span>`+
         `<span class="go">Open live cam ↗</span></a>`;
     }
-    if(lc.flag) box.innerHTML+=`<div class="flagguide"><b>🚩 Read the flag for a quick wind check:</b> limp ≈ calm · rippling ≈ 5–10 · half out ≈ 10–15 · straight &amp; snapping ≈ 15+ mph.</div>`;
+    if(lc.flag){ const fgScale=WUNIT==="kn"?"rippling ≈ 4–8 · half out ≈ 8–13 · straight &amp; snapping ≈ 13+ kn":"rippling ≈ 5–10 · half out ≈ 10–15 · straight &amp; snapping ≈ 15+ mph";
+      box.innerHTML+=`<div class="flagguide"><b>🚩 Read the flag for a quick wind check:</b> limp ≈ calm · ${fgScale}.</div>`; }
     w.appendChild(box);
   }
   w.appendChild(section("sec-radar","Doppler radar","Radar"));
@@ -543,7 +550,7 @@ function renderSummary(){
   const trend=windTrend();
   s.innerHTML=`<div class="pill">${good} of ${acts.length} activities good right now</div>`+
     `<div class="headline">${head}</div>`+
-    `<div class="line">Right now: <b>${round(COND.airF)}°F air</b>, <b>${COND.waterF!=null?round(COND.waterF)+"° water":"water n/a"}</b>, wind <b>${round(COND.windMph)} ${dir}</b> gusting ${round(COND.gustMph)}.${rainTxt}${COND.uv!=null?` UV ${round(COND.uv)} (${uvCat(COND.uv)}).`:""}</div>`+
+    `<div class="line">Right now: <b>${round(COND.airF)}°F air</b>, <b>${COND.waterF!=null?round(COND.waterF)+"° water":"water n/a"}</b>, wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b> gusting ${wS(COND.gustMph)}.${rainTxt}${COND.uv!=null?` UV ${round(COND.uv)} (${uvCat(COND.uv)}).`:""}</div>`+
     (trend?`<div class="line">${trend}</div>`:"");
 }
 function windTrend(){
@@ -553,20 +560,20 @@ function windTrend(){
   for(let i=s;i<s+6&&i<h.time.length;i++){const w=h.wind_speed_10m[i],g=h.wind_gusts_10m[i];
     if(g>peakG+4){worse=true;peakG=g;peakW=w;pt=new Date(h.time[i]*1000);}
     if(w<minW-4){better=true;minW=w;mt=new Date(h.time[i]*1000);}}
-  if(worse)return`<b>↗ Building</b> — wind rising toward ~${round(peakW)} mph, gusting ${round(peakG)}${pt?" by "+fmtHour(pt):""}.`;
-  if(better&&mt)return`<b>↘ Easing</b> — calming toward ~${round(minW)} mph by ${fmtHour(mt)}.`;
+  if(worse)return`<b>↗ Building</b> — wind rising toward ~${wS(peakW)} ${WUL}, gusting ${wS(peakG)}${pt?" by "+fmtHour(pt):""}.`;
+  if(better&&mt)return`<b>↘ Easing</b> — calming toward ~${wS(minW)} ${WUL} by ${fmtHour(mt)}.`;
   return`<b>→ Holding steady</b> for the next few hours.`;
 }
 
 function crewItems(c){
   const items=[]; const add=(key,lv,label,ico,why,tag)=>items.push({key,lv,label,ico,why,tag});
   const src=c.windLabel;
-  if(c.windMph>16)add("wind","poor","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — too rough for shells",src);
-  else if(c.windMph>10)add("wind","fair","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — chop building",src);
-  else add("wind","good","Wind","💨",round(c.windMph)+" mph "+compass(c.windDir)+" — light",src);
-  if(c.gustMph>23)add("gusts","poor","Gusts","🌬️",round(c.gustMph)+" mph — dangerous puffs",src);
-  else if(c.gustMph>17)add("gusts","fair","Gusts","🌬️",round(c.gustMph)+" mph — watch the puffs",src);
-  else add("gusts","good","Gusts","🌬️",round(c.gustMph)+" mph",src);
+  if(c.windMph>16)add("wind","poor","Wind","💨",wS(c.windMph)+" "+WUL+" "+compass(c.windDir)+" — too rough for shells",src);
+  else if(c.windMph>10)add("wind","fair","Wind","💨",wS(c.windMph)+" "+WUL+" "+compass(c.windDir)+" — chop building",src);
+  else add("wind","good","Wind","💨",wS(c.windMph)+" "+WUL+" "+compass(c.windDir)+" — light",src);
+  if(c.gustMph>23)add("gusts","poor","Gusts","🌬️",wS(c.gustMph)+" "+WUL+" — dangerous puffs",src);
+  else if(c.gustMph>17)add("gusts","fair","Gusts","🌬️",wS(c.gustMph)+" "+WUL+" — watch the puffs",src);
+  else add("gusts","good","Gusts","🌬️",wS(c.gustMph)+" "+WUL,src);
   if(c.windMph>16)add("water","poor","Water surface","🌊","Whitecaps / rough water");
   else if(c.windMph>11)add("water","fair","Water surface","🌊","Chop building");
   else add("water","good","Water surface","🌊","Calm — good set");
@@ -605,7 +612,7 @@ function renderCrewSummary(s,spot){
   const trend=windTrend();
   s.innerHTML=`<div class="pill">OBCR crew conditions</div>`+
     `<div class="headline">${head}</div>`+
-    `<div class="line">Wind <b>${round(COND.windMph)} mph ${dir}</b>, gusting <b>${round(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
+    `<div class="line">Wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b>, gusting <b>${wS(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
     (trend?`<div class="line">${trend}</div>`:"");
 }
 function renderCrew(a){
@@ -624,9 +631,9 @@ function renderCards(){
   cards.push(card("Water temp",COND.waterF!=null?round(COND.waterF)+"<small>°F</small>":"—",waterMeta,DATA.waterEst?"est":""));
   cards.push(card("Air temp",round(COND.airF)+"<small>°F</small>","Feels "+round(COND.feelsF)+"° · "+(WMO[COND.code]||"")));
   const dir=compass(COND.windDir);
-  cards.push(card("Wind",round(COND.windMph)+"<small> mph "+dir+"</small>","Gusts "+round(COND.gustMph)+" mph"+
+  cards.push(card("Wind",wS(COND.windMph)+"<small> "+WUL+" "+dir+"</small>","Gusts "+wS(COND.gustMph)+" "+WUL+
     (COND.windSource==="live"?" · live from "+(COND.windStations?COND.windStations.length:1)+" nearby station"+((COND.windStations&&COND.windStations.length>1)?"s":""):"")+
-    (COND.windSheltered?" · harbor-adjusted (model reads "+round(COND.windRaw)+")":""),
+    (COND.windSheltered?" · harbor-adjusted (model reads "+wS(COND.windRaw)+" "+WUL+")":""),
     COND.windSource==="live"?"live":(COND.windSheltered?"adj":"")));
   if(CFG.crew)cards.push(card("Visibility",COND.visMi!=null?(COND.visMi>=6?"Clear":COND.visMi.toFixed(1)+"<small> mi</small>"):"—",COND.visMi!=null&&COND.visMi<1?"⚠ fog — low visibility":"Fog/haze check"));
   if(COND.waveFt!=null)cards.push(card("Waves",round(COND.waveFt,1)+"<small> ft</small>",(COND.wavePeriod!=null?round(COND.wavePeriod)+"s swell":"")||"open-water est","est"));
@@ -691,8 +698,8 @@ function drawCards(mode){
       (isNow?`<div class="nowtag">NOW</div>`:``)+
       `<div class="t">${fine?fmtHM(p.date):fmtHour(p.date)}</div>`+
       `<div class="temp">${round(p.temp)}°</div>`+
-      `<div class="wind">${round(p.wind)} <span style="color:var(--muted);font-weight:400">${compass(p.dir)}</span></div>`+
-      `<div class="gust">gust ${round(p.gust)}</div>`+
+      `<div class="wind">${wS(p.wind)} <span style="color:var(--muted);font-weight:400">${compass(p.dir)}</span></div>`+
+      `<div class="gust">gust ${wS(p.gust)}</div>`+
       (p.precip!=null&&!isNaN(p.precip)?`<div class="rain">☔ ${round(p.precip)}%</div>`:``)+`</div>`;
   });
   strip.innerHTML=html;
@@ -706,14 +713,14 @@ function drawChart(mode){
   const padL=40,padR=14,padTop=14,lineBot=116,bandY=122,bandH=13,rainY=140,rainH=17,xLabY=176, botY=rainY+rainH;
   const t0=pts[0].tms, tEnd=pts[pts.length-1].tms;
   const X=tms=>padL+(W-padL-padR)*(tms-t0)/((tEnd-t0)||1);
-  const maxG=Math.max(15,...pts.map(p=>p.gust||0));
-  const niceMax=maxG<=15?15:maxG<=20?20:maxG<=30?30:Math.ceil(maxG/10)*10, yStep=niceMax<=15?5:niceMax<=30?10:15;
-  const Y=v=>lineBot-(lineBot-padTop)*(v/niceMax);
-  FGEO={W,X,Y};
+  const dmax=Math.max(WUNIT==="kn"?13:15,...pts.map(p=>wv(p.gust)||0));   // gusts in DISPLAY units
+  const niceMax=Math.ceil(dmax/5)*5, yStep=niceMax<=15?5:niceMax<=40?10:15;
+  const Y=v=>lineBot-(lineBot-padTop)*(v/niceMax);                        // v is in DISPLAY units
+  FGEO={W,X,Y,wv};
   let shade=""; for(let ms=t0;ms<tEnd;ms+=900000){if(nightAt(ms)){const x0=X(ms),x1=X(Math.min(ms+900000,tEnd));shade+=`<rect x="${x0.toFixed(1)}" y="${padTop}" width="${Math.max(0.5,x1-x0).toFixed(1)}" height="${botY-padTop}" fill="#e7edf1"/>`;}}
   let hi=""; if(mode!=="q15"){const x0=X(t0),x1=X(Math.min(t0+3*3600000,tEnd)); hi=`<rect x="${x0.toFixed(1)}" y="${padTop}" width="${(x1-x0).toFixed(1)}" height="${botY-padTop}" fill="#1b98c9" opacity="0.08"/>`;}
   let yg=""; for(let v=0;v<=niceMax;v+=yStep){const y=Y(v).toFixed(1); yg+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#eef2f5" stroke-width="1"/><text x="${padL-6}" y="${(+y+3).toFixed(1)}" font-size="10" fill="#8397a3" text-anchor="end">${v}</text>`;}
-  yg+=`<text x="6" y="${padTop+4}" font-size="9.5" fill="#8397a3">mph</text>`;
+  yg+=`<text x="6" y="${padTop+4}" font-size="9.5" fill="#8397a3">${WUL}</text>`;
   const wkday=d=>new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(d), labelEvery=pts.length>13?2:1;
   let vg="",band="",rain="",dayd="",xl="",lastDay=wkday(pts[0].date);
   pts.forEach((p,i)=>{const x=X(p.tms);
@@ -726,9 +733,9 @@ function drawChart(mode){
     lastDay=dy;
     if(i%labelEvery===0)xl+=`<text x="${x.toFixed(1)}" y="${xLabY}" font-size="10" fill="#5d7280" text-anchor="middle">${mode==="q15"?fmtHM(p.date):fmtHour(p.date)}</text>`;
   });
-  const wPath="M"+pts.map(p=>X(p.tms).toFixed(1)+","+Y(p.wind).toFixed(1)).join(" L");
-  const gPath="M"+pts.map(p=>X(p.tms).toFixed(1)+","+Y(p.gust).toFixed(1)).join(" L");
-  const dots=pts.map(p=>`<circle cx="${X(p.tms).toFixed(1)}" cy="${Y(p.wind).toFixed(1)}" r="2.4" fill="#0b4f6c"/>`).join("");
+  const wPath="M"+pts.map(p=>X(p.tms).toFixed(1)+","+Y(wv(p.wind)).toFixed(1)).join(" L");
+  const gPath="M"+pts.map(p=>X(p.tms).toFixed(1)+","+Y(wv(p.gust)).toFixed(1)).join(" L");
+  const dots=pts.map(p=>`<circle cx="${X(p.tms).toFixed(1)}" cy="${Y(wv(p.wind)).toFixed(1)}" r="2.4" fill="#0b4f6c"/>`).join("");
   const nx=X(t0);
   const nowM=`<line x1="${nx.toFixed(1)}" y1="${padTop-6}" x2="${nx.toFixed(1)}" y2="${botY}" stroke="#0b4f6c" stroke-width="1.5"/><text x="${(nx+3).toFixed(1)}" y="${(botY-4).toFixed(1)}" font-size="9" font-weight="800" fill="#0b4f6c">now</text>`;
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`); svg.setAttribute("height",H); svg.setAttribute("role","img");
@@ -742,11 +749,11 @@ function drawChart(mode){
 }
 function highlightPoint(i,fromChart){
   const p=FPTS[i]; if(!p||!FGEO)return; const cross=$("#cross"),dot=$("#cdot"),tip=$("#tip"),svg=$("#chart");
-  const x=FGEO.X(p.tms),y=FGEO.Y(p.wind);
+  const x=FGEO.X(p.tms),y=FGEO.Y((FGEO.wv||(v=>v))(p.wind));
   if(cross){cross.setAttribute("x1",x);cross.setAttribute("x2",x);cross.setAttribute("opacity",".5");}
   if(dot){dot.setAttribute("cx",x);dot.setAttribute("cy",y);dot.setAttribute("opacity","1");}
   if(tip&&svg){const rect=svg.getBoundingClientRect(),sc=rect.width?rect.width/FGEO.W:1;tip.style.left=(x*sc)+"px";tip.style.top=(y*sc)+"px";
-    tip.innerHTML=`<b>${fmtHM(p.date)}</b> · ${new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(p.date)}<br>wind <b>${round(p.wind)}</b> mph · gust <b>${round(p.gust)}</b>`+
+    tip.innerHTML=`<b>${fmtHM(p.date)}</b> · ${new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short"}).format(p.date)}<br>wind <b>${wS(p.wind)}</b> ${WUL} · gust <b>${wS(p.gust)}</b>`+
       (p.precip!=null?`<br>☔ rain <b>${round(p.precip)}%</b>`:``)+`<br><span class="r" style="background:${LVHEX[p.rating]}"></span>${LVLAB[p.rating]}`;
     tip.style.opacity="1";}
   const strip=$("#strip"); if(strip)strip.querySelectorAll(".hour").forEach(c=>c.classList.toggle("hl",+c.dataset.i===i));
