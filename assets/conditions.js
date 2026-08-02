@@ -216,8 +216,33 @@ const ACTS=[
     const rainy=(c.precipProb!=null&&c.precipProb>50)||[61,63,65,80,81,82].includes(c.code);
     if(isStorm(c.code)||rainy)return{lv:"good",why:"wet out — perfect night to stay in 🎲"};
     if(c.airF!=null&&c.airF<45)return{lv:"good",why:"chilly out — cozy games in"};
-    return{lv:"fair",why:"gorgeous out — save it for after dark"};}}
+    return{lv:"fair",why:"gorgeous out — save it for after dark"};}},
+
+ {key:"beachbike",label:"Beach biking",ico:"🚲",needs:s=>!!s.surf,score:(c)=>beachFirmSand(c)},
+ {key:"beachjog",label:"Beach jogging",ico:"🏃",needs:s=>!!s.surf,score:(c)=>beachFirmSand(c)}
 ];
+/* Firm wet sand at the waterline is only rideable/runnable near low tide (roughly 2h either
+   side). Best in good weather; the window tracks the nearest low tide. */
+function fmtMins(m){ m=Math.round(Math.abs(m)); if(m<60)return m+" min"; const h=Math.floor(m/60),mm=m%60; return h+"h"+(mm?" "+mm+"m":""); }
+function beachFirmSand(c){
+  if(isStorm(c.code))return{lv:"storm",why:"Thunderstorms — off the beach."};
+  let r=0,w=[];
+  if(c.precipProb!=null&&c.precipProb>60){r=2;w.push("rain likely "+round(c.precipProb)+"%");}
+  else if(c.precipProb!=null&&c.precipProb>35){r=1;w.push("showers possible "+round(c.precipProb)+"%");}
+  if(c.airF!=null){ if(c.airF>92){r=Math.max(r,1);w.push("hot "+round(c.airF)+"°");} else if(c.airF<38){r=Math.max(r,1);w.push("cold "+round(c.airF)+"°");}}
+  if(c.gustMph>28){r=Math.max(r,1);w.push("strong wind "+round(c.windMph)+" mph");}
+  if(c.minsToLow==null){ w.push("tide data unavailable — firm sand tracks low tide"); }
+  else if(c.nearLowTide){
+    const m=c.minsToLow;
+    w.push(Math.abs(m)<=20?"low tide now — firm, fast sand":(m>0?"firm sand — low tide in "+fmtMins(m):"firm sand — "+fmtMins(m)+" past low"));
+  } else {
+    r=Math.max(r,2);
+    const m=c.minsToLow, nl=(c.tide&&c.tide.nextLow)?fmtHour(c.tide.nextLow):null;
+    if(m>0) w.push("sand's soft — window opens ~"+fmtMins(m-120)+(nl?" (low tide "+nl+")":""));
+    else w.push("sand's soft now — catch the next low"+(nl?" ("+nl+")":""));
+  }
+  return{lv:lvFromRank(r),why:w.join(", ")};
+}
 
 /* ============================================================
    Fetching + deriving conditions for one spot
@@ -298,6 +323,14 @@ function deriveNow(data,spot){
     visMi:(h&&h.visibility&&h.visibility[hi]!=null)?h.visibility[hi]/1609.34:null,
     isDay:sr&&ss?(now>=sr&&now<=ss):true, tide:data.tide
   };
+  // nearest low tide (past or future), for firm-sand activities at the waterline
+  let minsToLow=null;
+  if(data.tideEvents&&data.tideEvents.length){
+    for(const e of data.tideEvents){ if(e.type!=="L")continue; const dm=(e.t-now)/60000;
+      if(minsToLow===null||Math.abs(dm)<Math.abs(minsToLow))minsToLow=dm; }
+  }
+  cond.minsToLow=minsToLow;                                   // signed: <0 = low was |x| min ago, >0 = in x min
+  cond.nearLowTide=minsToLow!=null&&Math.abs(minsToLow)<=120; // within the ~2h-either-side firm-sand window
   // water-quality assessment (rain runoff based)
   cond.wq=assessWQ(cond,spot);
   return cond;
