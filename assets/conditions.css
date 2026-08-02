@@ -93,6 +93,9 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 .livecam .flagguide{font-size:.8rem;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);line-height:1.5}
 /* external forecast link cards (clean link-outs, no injected scripts) */
 .camlinks{display:grid;gap:10px}
+/* embedded wind map (responsive 2:1 iframe) */
+.windmap{position:relative;width:100%;max-width:900px;margin:6px auto 0;aspect-ratio:900/450;border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow);background:#0d1418}
+.windmap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 
 /* combined rainbow status + signup bar (spans the full activities row) */
 .act.rainbar{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
