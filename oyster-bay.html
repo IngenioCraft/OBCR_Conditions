@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Oyster Bay — Rowing & Water Conditions (Beekman Beach)</title>
-<link rel="stylesheet" href="assets/conditions.css?v=20260819">
+<link rel="stylesheet" href="assets/conditions.css?v=20260821">
 <style>:root{--brand:#0b4f6c;--brand-2:#1b98c9}</style>
 <!-- Privacy-friendly analytics by Plausible -->
 <script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
@@ -22,13 +22,22 @@ window.SPOT_CONFIG = {
   crew: true,
   tz: "America/New_York",
   radarStation: "KOKX",
+  pollen: "https://costal-data.help-f0d.workers.dev/pollen",
   astro: true,
   waterQualityLink: "https://suffolkcountyny.gov/Departments/Health-Services/Environmental-Quality/Ecology/Beach-Monitoring-Program/AdvisoriesClosures",
   waterQualityLabel: "Suffolk County beach advisories",
   footNote: "Beekman Beach sits inside a sheltered bay, so wave models can't resolve local chop and often read near zero — trust wind and gusts as the real signal for rowing.",
   spots: [
     { id:"beekman", name:"Beekman Beach", lat:40.8767, lon:-73.5413, marine:true, sheltered:true,
+      // Directional shelter model. `open` = the compass bearing the wind blows FROM when it has the
+      // longest open-water fetch into the harbor (Oyster Bay opens ~NNW toward the Sound). Wind from
+      // that direction keeps the full model value; wind off the land is trimmed toward `min` (never below).
+      // TUNE from experience: set `open` to the wind that most chops up the bay; raise `min` if it feels too calm.
+      shelter:{ open:340, min:0.6 },
       tideStation:"8516201", waterTempStation:"8516945",
+      // Live wind is ready to switch on: add back windProxy pointing at the Worker /wind route once a
+      // free data source exists (e.g. a club-owned Tempest's owner token). Until then, the land-cell
+      // model (sheltered:true above) is used.
       note:"Theodore Roosevelt / Beekman Beach, Oyster Bay. Water temp is live from the Kings Point sensor." }
   ],
   // Live harbor cam. Sagamore Yacht Club looks over Oyster Bay harbor — the closest public
@@ -38,10 +47,11 @@ window.SPOT_CONFIG = {
     credit: "Sagamore Yacht Club",
     embed: "https://live3.brownrice.com/embed/sagamoreyc",
     link: "https://live3.brownrice.com/embed/sagamoreyc",
+    flag: true,
     note: "Live look at Oyster Bay harbor from the Sagamore Yacht Club — the nearest public camera to the rowing water (not Beekman Beach itself)."
   }
 };
 </script>
-<script src="assets/conditions.js?v=20260819"></script>
+<script src="assets/conditions.js?v=20260821"></script>
 </body>
 </html>

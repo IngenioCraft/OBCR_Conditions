@@ -263,10 +263,12 @@ async function fetchSpot(spot){
   const marU=spot.marine?("https://marine-api.open-meteo.com/v1/marine?latitude="+lat+"&longitude="+lon+
     "&current=wave_height,wave_period,sea_surface_temperature&hourly=wave_height&length_unit=imperial&temperature_unit=fahrenheit&timeformat=unixtime&timezone="+encodeURIComponent(TZ)):null;
 
-  const [wx,aq,mar]=await Promise.all([
+  const windU=spot.windProxy||null;  // optional live-wind proxy (Worker) — averaged PWS
+  const [wx,aq,mar,windLive]=await Promise.all([
     getJSON(wxU).catch(e=>{fails.push("Weather: "+e.message);return null;}),
     getJSON(aqU).catch(e=>{fails.push("Air quality: "+e.message);return null;}),
-    marU?getJSON(marU).catch(e=>{fails.push("Marine: "+e.message);return null;}):Promise.resolve(null)
+    marU?getJSON(marU).catch(e=>{fails.push("Marine: "+e.message);return null;}):Promise.resolve(null),
+    windU?getJSON(windU).catch(e=>{fails.push("Live wind: "+e.message);return null;}):Promise.resolve(null)
   ]);
   // water temp: NOAA live if station, else marine SST
   let waterF=null, waterSrc=null, waterEst=false;
@@ -295,7 +297,7 @@ async function fetchSpot(spot){
       }
     }catch(e){fails.push("Tides: "+e.message);}
   }
-  return {wx,aq,mar,waterF,waterSrc,waterEst,tide,tideEvents};
+  return {wx,aq,mar,waterF,waterSrc,waterEst,tide,tideEvents,windLive};
 }
 
 function deriveNow(data,spot){
@@ -334,9 +336,35 @@ function deriveNow(data,spot){
   }
   cond.minsToLow=minsToLow;                                   // signed: <0 = low was |x| min ago, >0 = in x min
   cond.nearLowTide=minsToLow!=null&&Math.abs(minsToLow)<=120; // within the ~2h-either-side firm-sand window
+  // live wind: a fresh averaged PWS reading beats the model for a sheltered harbor
+  cond.windSource="model";
+  const wl=data.windLive;
+  if(wl&&wl.fresh&&wl.windMph!=null){
+    cond.windMph=wl.windMph;
+    if(wl.gustMph!=null)cond.gustMph=wl.gustMph;
+    if(wl.dir!=null)cond.windDir=wl.dir;
+    cond.windSource="live"; cond.windStations=wl.stations||[]; cond.windAgeMin=wl.ageMin;
+  }
+  // directional shelter (tucked-in harbors): trim MODEL wind blowing off the land, keep it when
+  // it's blowing down the open water. Conservative — gusts trimmed only half as much, floored at spot.shelter.min.
+  if(spot.shelter&&cond.windSource==="model"&&cond.windMph!=null&&cond.windDir!=null){
+    const f=shelterFactor(cond.windDir,spot.shelter.open,spot.shelter.min);
+    if(f<0.995){ cond.windRaw=cond.windMph; cond.gustRaw=cond.gustMph;
+      cond.windMph=cond.windMph*f;
+      if(cond.gustMph!=null)cond.gustMph=cond.gustMph*(1-(1-f)*0.5);
+      cond.windSheltered=true; cond.windFactor=f; }
+  }
   // water-quality assessment (rain runoff based)
   cond.wq=assessWQ(cond,spot);
   return cond;
+}
+/* Shelter factor: 1.0 when wind blows FROM the open-water bearing (long fetch, keep the model),
+   down to minF when it blows from the opposite side (off the land). Smooth cosine falloff. */
+function shelterFactor(fromDir,openBearing,minF){
+  minF=(minF==null)?0.6:minF; if(openBearing==null)return 1;
+  let diff=Math.abs(fromDir-openBearing); if(diff>180)diff=360-diff;
+  const t=(1+Math.cos(diff*Math.PI/180))/2;   // 1 aligned with open water, 0 straight off the land
+  return minF+(1-minF)*t;
 }
 
 function assessWQ(cond,spot){
@@ -400,6 +428,7 @@ function skeleton(){
         `<span class="ic">📹</span><span class="lt"><b>${lc.label||'Live camera'}</b>${lc.credit?`<span class="src">${lc.credit}</span>`:''}</span>`+
         `<span class="go">Open live cam ↗</span></a>`;
     }
+    if(lc.flag) box.innerHTML+=`<div class="flagguide"><b>🚩 Read the flag for a quick wind check:</b> limp ≈ calm · rippling ≈ 5–10 · half out ≈ 10–15 · straight &amp; snapping ≈ 15+ mph.</div>`;
     w.appendChild(box);
   }
   w.appendChild(section("sec-radar","Doppler radar","Radar"));
@@ -409,6 +438,7 @@ function skeleton(){
   w.appendChild(section("sec-tides","Tides","Tides"));
   w.appendChild(el("div","tides")).id="tides";
   if(CFG.astro){ w.appendChild(section("sec-sky","Sky · moon, meteors &amp; rainbows","Sky")); w.appendChild(el("div","wq")).id="astro"; }
+  if(CFG.pollen){ w.appendChild(section("sec-pollen","Pollen &amp; allergies","Pollen")); w.appendChild(el("div","wq")).id="pollen"; }
   w.appendChild(section("sec-nature","Nature &amp; sky notes","Nature")); w.appendChild(el("div","wq")).id="nature";
   w.appendChild(el("div","note",(CFG.footNote||"")+
     "<br><br>Activity ratings are automated guidance from weather &amp; marine models to help you plan — not a substitute for lifeguards, posted flags, official advisories, or your own judgment on the day."));
@@ -455,7 +485,7 @@ async function loadActive(){
   renderSummary(); renderCards(); renderActs(); renderForecast(currentMode()); renderWQ();
   if(CFG.ferry)renderFerry();
   if(CFG.fishing)renderFishing(); if(CFG.shellfish)renderShellfish();
-  renderTides(); if(CFG.astro)renderAstro(); renderNature(); loadRadar();
+  renderTides(); if(CFG.astro)renderAstro(); renderNature(); if(CFG.pollen)renderPollen(); loadRadar();
   const diag=$("#diag");
   if(fails.length){diag.style.display="block";
     diag.innerHTML="<b>Some live data didn't load.</b> If you're viewing this in a preview pane, that's expected — external data is blocked there and it works once hosted or opened directly in a browser. Details: "+[...new Set(fails)].join("; ")+".";}
@@ -578,7 +608,10 @@ function renderCards(){
   cards.push(card("Water temp",COND.waterF!=null?round(COND.waterF)+"<small>°F</small>":"—",waterMeta,DATA.waterEst?"est":""));
   cards.push(card("Air temp",round(COND.airF)+"<small>°F</small>","Feels "+round(COND.feelsF)+"° · "+(WMO[COND.code]||"")));
   const dir=compass(COND.windDir);
-  cards.push(card("Wind",round(COND.windMph)+"<small> mph "+dir+"</small>","Gusts "+round(COND.gustMph)+" mph"));
+  cards.push(card("Wind",round(COND.windMph)+"<small> mph "+dir+"</small>","Gusts "+round(COND.gustMph)+" mph"+
+    (COND.windSource==="live"?" · live from "+(COND.windStations?COND.windStations.length:1)+" nearby station"+((COND.windStations&&COND.windStations.length>1)?"s":""):"")+
+    (COND.windSheltered?" · harbor-adjusted (model reads "+round(COND.windRaw)+")":""),
+    COND.windSource==="live"?"live":(COND.windSheltered?"adj":"")));
   if(CFG.crew)cards.push(card("Visibility",COND.visMi!=null?(COND.visMi>=6?"Clear":COND.visMi.toFixed(1)+"<small> mi</small>"):"—",COND.visMi!=null&&COND.visMi<1?"⚠ fog — low visibility":"Fog/haze check"));
   if(COND.waveFt!=null)cards.push(card("Waves",round(COND.waveFt,1)+"<small> ft</small>",(COND.wavePeriod!=null?round(COND.wavePeriod)+"s swell":"")||"open-water est","est"));
   const uvB=uvBurn(COND.uv);
@@ -1172,6 +1205,18 @@ function renderNature(){
   parts.push(`<div class="detail" style="margin-top:10px"><b>🌿 In season now:</b><br>${wildlifeNow()}</div>`);
   parts.push(`<div class="detail" style="margin-top:10px;font-style:italic">Seasonal notes are general Long Island guidance — wildlife timing shifts year to year.</div>`);
   box.innerHTML=parts.join("");
+}
+function renderPollen(){
+  const box=$("#pollen"); if(!box||!CFG.pollen)return; const spot=CFG.spots[ACTIVE];
+  box.innerHTML='<span style="color:var(--muted)">Checking pollen…</span>';
+  const url=CFG.pollen+(CFG.pollen.indexOf("?")>=0?"&":"?")+"lat="+spot.lat+"&lon="+spot.lon;
+  getJSON(url).then(d=>{ const cur=$("#pollen"); if(!cur)return;
+    if(!d||d.error||!d.types){cur.innerHTML='<span style="color:var(--muted)">Pollen data unavailable right now.</span>';return;}
+    const line=d.types.map(t=>`${t.name}: <b>${t.category}</b>`).join(" · ");
+    const plants=(d.plants&&d.plants.length)?`<div class="detail" style="margin-top:6px">Main culprits: ${d.plants.map(p=>p.name+" ("+String(p.category).toLowerCase()+")").join(", ")}.</div>`:"";
+    cur.innerHTML=`<div class="detail"><b>🌾 Pollen today:</b> ${line}.</div>${plants}`+
+      `<div class="detail" style="margin-top:8px;font-style:italic">Tree/grass/weed levels for this spot; updates about once a day.</div>`;
+  }).catch(()=>{const cur=$("#pollen");if(cur)cur.innerHTML='<span style="color:var(--muted)">Pollen data unavailable right now.</span>';});
 }
 function renderTides(){
   const t=$("#tides"); const ev=DATA&&DATA.tideEvents;
