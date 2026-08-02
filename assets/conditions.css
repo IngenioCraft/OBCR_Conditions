@@ -91,10 +91,8 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 .livecam .camlink .lt .src{font-size:.8rem;color:var(--muted)}
 .livecam .camlink .go{flex:0 0 auto;font-weight:700;font-size:.85rem;color:var(--brand-2)}
 .livecam .flagguide{font-size:.8rem;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);line-height:1.5}
-/* third-party wind forecast widgets */
-.windywidget{margin:8px 0;min-height:120px}
-.sailflow{margin:12px 0}
-.sailflow iframe{width:100%;min-height:440px;border:1px solid var(--line);border-radius:12px;background:#fff}
+/* external forecast link cards (clean link-outs, no injected scripts) */
+.camlinks{display:grid;gap:10px}
 
 /* combined rainbow status + signup bar (spans the full activities row) */
 .act.rainbar{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
