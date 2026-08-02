@@ -384,6 +384,21 @@ function skeleton(){
   w.appendChild(el("div","wq")).id="wq";
   if(CFG.fishing){ w.appendChild(section("sec-fishing","What's biting now — seasonal fishing","Fishing")); const f=el("div","wq"); f.id="fishing"; w.appendChild(f); }
   if(CFG.shellfish){ w.appendChild(section("sec-shellfish","Shellfish safety","Shellfish")); const sh=el("div","wq"); sh.id="shellfish"; w.appendChild(sh); }
+  if(CFG.liveCam){ const lc=CFG.liveCam;
+    w.appendChild(section("sec-cam","Live camera","Live cam"));
+    if(lc.note) w.appendChild(el("p","h2note",lc.note));
+    const box=el("div","livecam"), src=lc.credit?" · "+lc.credit:"";
+    if(lc.embed){
+      box.innerHTML=`<div class="camframe"><iframe src="${lc.embed}" title="${lc.label||'Live camera'}" loading="lazy" allow="autoplay; fullscreen" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe></div>`+
+        `<div class="cap">${lc.label||'Live camera'}${src} · <a href="${lc.link||lc.embed}" target="_blank" rel="noopener">open full cam ↗</a></div>`;
+    } else if(lc.link){
+      // host doesn't allow embedding — offer a clean link-out card
+      box.innerHTML=`<a class="camlink" href="${lc.link}" target="_blank" rel="noopener">`+
+        `<span class="ic">📹</span><span class="lt"><b>${lc.label||'Live camera'}</b>${lc.credit?`<span class="src">${lc.credit}</span>`:''}</span>`+
+        `<span class="go">Open live cam ↗</span></a>`;
+    }
+    w.appendChild(box);
+  }
   w.appendChild(section("sec-radar","Doppler radar","Radar"));
   w.appendChild(el("p","h2note","NWS "+(CFG.radarStation||"KOKX")+" loop — your area is near the center."));
   const rad=el("div","radar"); rad.innerHTML='<img id="radar" alt="radar loop"><div class="cap" id="radarcap">Loading radar…</div>';
