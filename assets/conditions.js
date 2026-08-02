@@ -250,11 +250,14 @@ function beachFirmSand(c){
 async function fetchSpot(spot){
   const {lat,lon}=spot;
   const wxU="https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+
-    "&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index"+
+    "&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index,cloud_cover"+
     "&minutely_15=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code"+
-    "&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index,visibility"+
-    "&daily=sunrise,sunset,uv_index_max,precipitation_sum&timeformat=unixtime&past_days=1&forecast_days=3"+
-    "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone="+encodeURIComponent(TZ);
+    "&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index,visibility,cloud_cover"+
+    "&daily=sunrise,sunset,uv_index_max,precipitation_sum&timeformat=unixtime&past_days=1&forecast_days=7"+
+    "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone="+encodeURIComponent(TZ)+
+    // Sheltered harbors are smaller than the model grid cell; forcing the nearest LAND cell avoids
+    // reading the windier open-water value. Set spot.sheltered:true for tucked-in bays/harbors.
+    (spot.sheltered?"&cell_selection=land":"");
   const aqU="https://air-quality-api.open-meteo.com/v1/air-quality?latitude="+lat+"&longitude="+lon+
     "&current=us_aqi&timezone="+encodeURIComponent(TZ);
   const marU=spot.marine?("https://marine-api.open-meteo.com/v1/marine?latitude="+lat+"&longitude="+lon+
@@ -406,6 +409,7 @@ function skeleton(){
   w.appendChild(section("sec-tides","Tides","Tides"));
   w.appendChild(el("div","tides")).id="tides";
   if(CFG.astro){ w.appendChild(section("sec-sky","Sky · moon, meteors &amp; rainbows","Sky")); w.appendChild(el("div","wq")).id="astro"; }
+  w.appendChild(section("sec-nature","Nature &amp; sky notes","Nature")); w.appendChild(el("div","wq")).id="nature";
   w.appendChild(el("div","note",(CFG.footNote||"")+
     "<br><br>Activity ratings are automated guidance from weather &amp; marine models to help you plan — not a substitute for lifeguards, posted flags, official advisories, or your own judgment on the day."));
   w.appendChild(el("footer",null,sourcesHtml()));
@@ -451,7 +455,7 @@ async function loadActive(){
   renderSummary(); renderCards(); renderActs(); renderForecast(currentMode()); renderWQ();
   if(CFG.ferry)renderFerry();
   if(CFG.fishing)renderFishing(); if(CFG.shellfish)renderShellfish();
-  renderTides(); if(CFG.astro)renderAstro(); loadRadar();
+  renderTides(); if(CFG.astro)renderAstro(); renderNature(); loadRadar();
   const diag=$("#diag");
   if(fails.length){diag.style.display="block";
     diag.innerHTML="<b>Some live data didn't load.</b> If you're viewing this in a preview pane, that's expected — external data is blocked there and it works once hosted or opened directly in a browser. Details: "+[...new Set(fails)].join("; ")+".";}
@@ -1087,6 +1091,87 @@ function renderAstro(){
     `<div class="detail" id="planets" style="margin-top:10px"><b>🪐 Planets:</b> checking the sky…</div>`+
     `<div class="detail" style="margin-top:10px;font-style:italic">Moon, rainbow &amp; meteor peaks are computed locally (approximate); planet positions use the astronomy-engine almanac. A stargazing app has exact rise/set times.</div>`;
   fillPlanets(spot);
+}
+/* ============================================================
+   Nature & sky notes — reuses moon, tide, sun, water & cloud data
+   ============================================================ */
+const WILDLIFE=[
+  {emoji:"🦅",name:"Ospreys",from:"03-18",to:"09-20",note:"nesting on channel markers &amp; platforms; they migrate to South America by late September"},
+  {emoji:"🌹",name:"Beach roses",from:"06-01",to:"08-15",note:"Rosa rugosa in bloom along the dunes"},
+  {emoji:"✨",name:"Fireflies",from:"06-01",to:"07-20",note:"lighting up dunes &amp; yards after dusk"},
+  {emoji:"🌊",name:"Sea sparkle",from:"07-20",to:"09-20",note:"bioluminescence possible on warm, dark, calm nights"},
+  {emoji:"🐋",name:"Whales &amp; dolphins",from:"06-15",to:"10-15",note:"feeding offshore as bunker (menhaden) run"},
+  {emoji:"🌾",name:"Goldenrod &amp; asters",from:"08-20",to:"10-15",note:"blooming along dunes &amp; roadsides"},
+  {emoji:"🦋",name:"Monarchs",from:"09-01",to:"10-10",note:"streaming down the coast toward Mexico"},
+  {emoji:"🦭",name:"Harbor seals",from:"11-15",to:"04-15",note:"hauled out on rocks &amp; sandbars — give them room"}
+];
+function daysUntilMD(md){ const now=new Date(),y=now.getFullYear(),p=md.split("-");
+  let d=new Date(y,+p[0]-1,+p[1]); if(d<now)d=new Date(y+1,+p[0]-1,+p[1]); return Math.round((d-now)/86400000); }
+function wildlifeNow(){
+  const t=todayMD();
+  const active=WILDLIFE.filter(m=>inRange(t,m.from,m.to));
+  let html=active.slice(0,5).map(m=>`${m.emoji} <b>${m.name}</b> — ${m.note}`).join("<br>");
+  const up=WILDLIFE.filter(m=>!inRange(t,m.from,m.to)).map(m=>({m,d:daysUntilMD(m.from)})).sort((a,b)=>a.d-b.d)[0];
+  if(up&&up.d<45) html+=(html?"<br>":"")+`<span style="color:var(--muted)">Coming up: ${up.m.emoji} ${up.m.name} around ${fmtMD(up.m.from)}.</span>`;
+  return html||"Quiet season — check back as spring warms up.";
+}
+function mdOf(dt){ return (dt.getMonth()+1)+"-"+dt.getDate(); }
+function goldenHourHTML(c){
+  if(!c.sunrise||!c.sunset)return null;
+  const amEnd=new Date(c.sunrise.getTime()+40*60000), pmStart=new Date(c.sunset.getTime()-40*60000);
+  return `Morning ${fmtTime(c.sunrise)}–${fmtTime(amEnd)}, evening ${fmtTime(pmStart)}–${fmtTime(c.sunset)}. Blue hour is the ~20 min just before sunrise &amp; after sunset.`;
+}
+function horseshoeHTML(){
+  const t=todayMD(); if(!inRange(t,"04-25","07-10"))return null;
+  const mp=moonPhase(new Date()), near=mp.illum<10||mp.illum>90;
+  let hi=null; const ev=DATA&&DATA.tideEvents, now=new Date();
+  if(ev){ const fut=ev.filter(e=>e.type==="H"&&e.t>now);
+    hi=fut.find(e=>{const h=+new Intl.DateTimeFormat("en-US",{hour:"numeric",hour12:false,timeZone:TZ}).format(e.t);return h>=18||h<=1;})||fut[0]; }
+  const hiTxt=hi?fmtTime(hi.t):"the evening high tide";
+  const soon=mp.nextNew<mp.nextFull?mp.nextNew:mp.nextFull, sn=mp.nextNew<mp.nextFull?"new moon":"full moon";
+  if(near) return `<b>Spawning likely tonight</b> — best around the evening high tide (${hiTxt}); look at the waterline after dark.`;
+  return `Spawning season — the big nights are the next ${sn} (${fmtMD(mdOf(soon))}). A few crawl up on any evening high tide (${hiTxt}).`;
+}
+function jellyfishHTML(c){
+  const t=todayMD(); if(!inRange(t,"06-25","09-30"))return null;
+  if(c.waterF==null)return null;
+  const warm=c.waterF>=68, breezy=c.windMph>=8;
+  if(warm&&breezy) return `<b>Higher odds</b> — warm water (${round(c.waterF)}°) and an onshore breeze can push jellyfish &amp; sea nettles toward the beach.`;
+  if(warm) return `Some possible — water's warm (${round(c.waterF)}°) but winds are light; usually easy to avoid.`;
+  return `Low right now — water's still on the cool side (${round(c.waterF)}°).`;
+}
+function stargazeHTML(){
+  const wx=DATA&&DATA.wx, H=wx&&wx.hourly; if(!H||!H.cloud_cover)return null;
+  const buckets={};
+  for(let i=0;i<H.time.length;i++){ const tms=H.time[i]*1000;
+    if(tms<Date.now()-3600000)continue;
+    const h=+new Intl.DateTimeFormat("en-US",{hour:"numeric",hour12:false,timeZone:TZ}).format(new Date(tms));
+    if(h<21&&h>2)continue;                                   // only late-night hours
+    const cc=H.cloud_cover[i]; if(cc==null)continue;
+    const key=new Intl.DateTimeFormat("en-CA",{timeZone:TZ,month:"2-digit",day:"2-digit"}).format(new Date(tms-(h<=2?86400000:0)));
+    (buckets[key]=buckets[key]||{sum:0,n:0,tms}).sum+=cc; buckets[key].n++;
+  }
+  const nights=Object.values(buckets).map(v=>{ const cloud=v.sum/v.n, illum=moonPhase(new Date(v.tms)).illum;
+    return {cloud,illum,tms:v.tms,score:cloud*0.6+illum*0.4}; });
+  if(!nights.length)return null;
+  const byTime=nights.slice().sort((a,b)=>a.tms-b.tms);
+  nights.sort((a,b)=>a.score-b.score);
+  const best=nights[0], dt=new Date(best.tms);
+  const wd=new Intl.DateTimeFormat("en-US",{weekday:"long",timeZone:TZ}).format(dt);
+  const tonight=byTime[0].tms===best.tms;
+  const cloudTxt=best.cloud<25?"clear skies":best.cloud<55?"partly clear":"cloudy";
+  const mp=moonPhase(new Date());
+  return `Best window ahead: <b>${tonight?"tonight":wd}</b> — ${cloudTxt}, moon ${Math.round(best.illum)}% lit. Darkest skies around the new moon (${fmtMD(mdOf(mp.nextNew))}).`;
+}
+function renderNature(){
+  const box=$("#nature"); if(!box||!COND)return; const c=COND, parts=[];
+  const gh=goldenHourHTML(c); if(gh)parts.push(`<div class="detail"><b>🌅 Golden hour:</b> ${gh}</div>`);
+  const sg=stargazeHTML(); if(sg)parts.push(`<div class="detail" style="margin-top:10px"><b>🔭 Stargazing:</b> ${sg}</div>`);
+  const hc=horseshoeHTML(); if(hc)parts.push(`<div class="detail" style="margin-top:10px"><b>🦀 Horseshoe crabs:</b> ${hc}</div>`);
+  const jf=jellyfishHTML(c); if(jf)parts.push(`<div class="detail" style="margin-top:10px"><b>🪼 Jellyfish:</b> ${jf}</div>`);
+  parts.push(`<div class="detail" style="margin-top:10px"><b>🌿 In season now:</b><br>${wildlifeNow()}</div>`);
+  parts.push(`<div class="detail" style="margin-top:10px;font-style:italic">Seasonal notes are general Long Island guidance — wildlife timing shifts year to year.</div>`);
+  box.innerHTML=parts.join("");
 }
 function renderTides(){
   const t=$("#tides"); const ev=DATA&&DATA.tideEvents;
