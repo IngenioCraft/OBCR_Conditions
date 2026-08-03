@@ -99,6 +99,7 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 /* wind data-source tag on the crew pills + summary */
 .act .srctag{font-size:.72rem;color:var(--muted);margin-top:5px;font-weight:600}
 .summary .srcinline{opacity:.9;font-weight:400;font-size:.86em}
+.summary .precipline{margin-top:5px}
 
 /* combined rainbow status + signup bar (spans the full activities row) */
 .act.rainbar{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap;

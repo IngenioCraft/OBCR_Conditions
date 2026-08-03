@@ -330,7 +330,7 @@ function deriveNow(data,spot){
     waterF:data.waterF, waveFt:data.mar&&data.mar.current?data.mar.current.wave_height:null,
     wavePeriod:data.mar&&data.mar.current?data.mar.current.wave_period:null,
     precipProb:h&&h.precipitation_probability?h.precipitation_probability[hi]:null,
-    recentRainIn:recentRain, sunrise:sr, sunset:ss,
+    recentRainIn:recentRain, cloudCover:(c.cloud_cover!=null?c.cloud_cover:(h&&h.cloud_cover?h.cloud_cover[hi]:null)), sunrise:sr, sunset:ss,
     visMi:(h&&h.visibility&&h.visibility[hi]!=null)?h.visibility[hi]/1609.34:null,
     isDay:sr&&ss?(now>=sr&&now<=ss):true, tide:data.tide
   };
@@ -364,9 +364,44 @@ function deriveNow(data,spot){
   cond.windLabel = cond.windSource==="live"
     ? "live · "+(spot.windSourceName || (cond.windStations&&cond.windStations[0]) || "nearby harbor station")
     : (cond.windSheltered ? "harbor-adjusted forecast model" : "forecast model");
+  // precipitation nowcast — radar-model 15-min buckets (raining now / when it starts or stops)
+  cond.precip=precipNow(wx);
+  // real rain-gauge accumulation today (only where a live station reports it, e.g. Sagamore)
+  if(wl&&wl.rain!=null&&!isNaN(+wl.rain)){ cond.gaugeRain=+wl.rain; cond.gaugeRainUnit=wl.rainUnits||"in";
+    cond.gaugeRainSrc=spot.windSourceName||(wl.stations&&wl.stations[0])||"gauge"; }
   // water-quality assessment (rain runoff based)
   cond.wq=assessWQ(cond,spot);
   return cond;
+}
+/* Precip nowcast from Open-Meteo minutely_15 (radar-blended). Reads the current 15-min bucket and
+   the next ~3h to say whether it's raining now and when it starts/stops. Amounts are inches PER 15-min
+   bucket, so in/hr ≈ amount×4. Returns null when there's nothing worth saying. */
+function precipNow(wx){
+  const m=wx&&wx.minutely_15;
+  if(!m||!m.time||!m.precipitation)return null;
+  const now=Date.now();
+  let i=m.time.findIndex(t=>t*1000>now); i=i<=0?0:i-1;   // current bucket
+  const N=m.time.length;
+  const amt=k=>(k>=0&&k<N&&m.precipitation[k]!=null)?+m.precipitation[k]:0;
+  const rate=k=>amt(k)*4;                                 // in/hr from a 15-min amount
+  const WET=0.002;                                        // in per 15-min ≈ 0.008 in/hr — a real trace
+  const HORIZON=Math.min(i+12,N-1);                       // ~3h out
+  const raining=amt(i)>=WET;
+  const cat=r=> r>=0.3?"heavy": r>=0.1?"moderate": r>=0.02?"light":"trace";
+  if(raining){
+    // find when it stops (first dry bucket) within the horizon
+    let stop=null;
+    for(let k=i+1;k<=HORIZON;k++){ if(amt(k)<WET){stop=new Date(m.time[k]*1000);break;} }
+    return {state:"wet", rate:rate(i), cat:cat(rate(i)),
+      stop, note: stop?("easing ~"+fmtHM(stop)):"steady for the next few hours"};
+  }
+  // dry now — look ahead for the onset of rain
+  for(let k=i+1;k<=HORIZON;k++){
+    if(amt(k)>=WET){ const start=new Date(m.time[k]*1000);
+      return {state:"soon", rate:rate(k), cat:cat(rate(k)), start,
+        note:"showers likely ~"+fmtHM(start)}; }
+  }
+  return {state:"dry"};
 }
 /* Shelter factor: 1.0 when wind blows FROM the open-water bearing (long fetch, keep the model),
    down to minF when it blows from the opposite side (off the land). Smooth cosine falloff. */
@@ -545,13 +580,31 @@ function renderSummary(){
   else{lv="fair";head="A mixed bag today";}
   s.className="summary lv-"+lv;
   const dir=compass(COND.windDir);
-  const rain=COND.precipProb;
-  const rainTxt=rain==null?"":rain>50?` Rain likely (${round(rain)}%).`:rain>20?` Slight rain chance.`:` No rain expected.`;
   const trend=windTrend();
   s.innerHTML=`<div class="pill">${good} of ${acts.length} activities good right now</div>`+
     `<div class="headline">${head}</div>`+
-    `<div class="line">Right now: <b>${round(COND.airF)}°F air</b>, <b>${COND.waterF!=null?round(COND.waterF)+"° water":"water n/a"}</b>, wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b> gusting ${wS(COND.gustMph)}.${rainTxt}${COND.uv!=null?` UV ${round(COND.uv)} (${uvCat(COND.uv)}).`:""}</div>`+
+    `<div class="line">Right now: <b>${round(COND.airF)}°F air</b>, <b>${COND.waterF!=null?round(COND.waterF)+"° water":"water n/a"}</b>, wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b> gusting ${wS(COND.gustMph)}.${COND.uv!=null?` UV ${round(COND.uv)} (${uvCat(COND.uv)}).`:""}</div>`+
+    precipLineHTML()+
     (trend?`<div class="line">${trend}</div>`:"");
+}
+/* One-line precip nowcast for the summary — replaces the vague "30% chance".
+   Uses the radar-blended 15-min nowcast, and the real gauge accumulation where we have one. */
+function precipLineHTML(){
+  const p=COND&&COND.precip; const bits=[];
+  if(p){
+    if(p.state==="wet"){
+      const rt=p.rate>=0.02?" (~"+p.rate.toFixed(p.rate<0.1?2:1)+" in/hr)":"";
+      bits.push(`<b>🌧 Raining now</b> — ${p.cat}${rt}, ${p.note}`);
+    } else if(p.state==="soon"){
+      bits.push(`<b>Dry now</b> — ${p.note}`);
+    } else {
+      bits.push(`<b>Dry now</b> — no rain on the near-term radar`);
+    }
+  }
+  if(COND&&COND.gaugeRain!=null){
+    bits.push(`<span class="srcinline">${COND.gaugeRain.toFixed(2)} ${COND.gaugeRainUnit} today at the ${COND.gaugeRainSrc}</span>`);
+  }
+  return bits.length?`<div class="line precipline">${bits.join(" · ")}</div>`:"";
 }
 function windTrend(){
   const h=DATA&&DATA.wx?DATA.wx.hourly:null; if(!h)return"";
@@ -613,6 +666,7 @@ function renderCrewSummary(s,spot){
   s.innerHTML=`<div class="pill">OBCR crew conditions</div>`+
     `<div class="headline">${head}</div>`+
     `<div class="line">Wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b>, gusting <b>${wS(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
+    precipLineHTML()+
     (trend?`<div class="line">${trend}</div>`:"");
 }
 function renderCrew(a){
@@ -1006,8 +1060,20 @@ function rainbowStatus(spot){
   if(!COND.isDay||sp.alt<0){out.why="sun isn't up";out.full="Unlikely — the sun isn't up. Rainbows need sunlight low in the sky.";return out;}
   if(sp.alt>42){out.why="sun too high ("+round(sp.alt)+"°)";out.full=`Unlikely right now — the sun is high (${round(sp.alt)}° up). Best odds are within ~2 hrs of sunrise or sunset, when the sun drops below 42°.`;return out;}
   const code=COND.code, showery=[51,53,55,61,63,65,80,81,82,95,96,99].includes(code), recent=COND.recentRainIn!=null&&COND.recentRainIn>0.02;
-  if(showery){out.lv="good";out.label="Likely";out.why="sun low + showers — look "+look;out.full=`<b>Good chance</b> — the sun is low (${round(sp.alt)}°) with showers around. Look toward the <b>${look}</b> (opposite the sun).`;return out;}
-  if(recent){out.lv="fair";out.label="Maybe";out.why="rained recently — watch "+look;out.full=`<b>Possible</b> — it rained recently and the sun is low (${round(sp.alt)}°). If the sun breaks through, look toward the <b>${look}</b>.`;return out;}
+  const cloud=(COND.cloudCover==null||isNaN(+COND.cloudCover))?null:+COND.cloudCover;
+  // A rainbow needs the sun actually shining on the rain. Solid overcast (pouring) = sun blocked = no bow.
+  if(cloud!=null&&cloud>85){out.why="overcast ("+round(cloud)+"% cloud) — sun blocked";out.full=`Unlikely right now — it's overcast (${round(cloud)}% cloud). A rainbow needs the sun shining on the rain, and right now the sun's blocked. Best after the downpour, when the sky starts to break.`;return out;}
+  const sunClear=cloud==null?true:cloud<=62;
+  if(showery){
+    if(sunClear){out.lv="good";out.label="Likely";out.why="sun low + showers, sky breaking — look "+look;out.full=`<b>Good chance</b> — the sun is low (${round(sp.alt)}°) with showers around and the sky breaking. Look toward the <b>${look}</b> (opposite the sun).`;}
+    else{out.lv="fair";out.label="Maybe";out.why="showers but "+round(cloud)+"% cloud — needs a break";out.full=`<b>Possible</b> — showers about and the sun is low (${round(sp.alt)}°), but it's still ${round(cloud)}% cloudy. If the sun breaks through, look toward the <b>${look}</b>.`;}
+    return out;
+  }
+  if(recent){
+    if(sunClear){out.lv="fair";out.label="Maybe";out.why="rained recently — watch "+look;out.full=`<b>Possible</b> — it rained recently and the sun is low (${round(sp.alt)}°). If the sun stays out, look toward the <b>${look}</b>.`;}
+    else{out.why="rained recently but "+round(cloud)+"% cloud";out.full=`Low — it rained recently but it's still ${round(cloud)}% cloudy. If the sky breaks while the sun's low, look toward the <b>${look}</b>.`;}
+    return out;
+  }
   out.why="no rain about; sun low ("+round(sp.alt)+"°)";out.full=`Low — the sun is nicely low (${round(sp.alt)}°) but there's no rain about. If a shower passes while the sun stays out, look toward the <b>${look}</b>.`;
   return out;
 }
