@@ -344,10 +344,18 @@ function deriveNow(data,spot){
   cond.nearLowTide=minsToLow!=null&&Math.abs(minsToLow)<=120; // within the ~2h-either-side firm-sand window
   // live wind: a fresh averaged PWS reading beats the model for a sheltered harbor
   cond.windSource="model";
+  const modelGust=cond.gustMph;                               // keep the model gust as a sane fallback
   const wl=data.windLive;
   if(wl&&wl.fresh&&wl.windMph!=null){
     cond.windMph=wl.windMph;
-    if(wl.gustMph!=null)cond.gustMph=wl.gustMph;
+    if(wl.gustMph!=null){
+      // Reject an implausible live gust (a stuck / spiking anemometer). A gust more than ~2.5× the
+      // sustained wind AND >18 mph above it isn't physical from one sensor — fall back to the model gust,
+      // which stays consistent with the sustained wind. Keeps genuine gustiness, drops sensor spikes.
+      const spike = wl.windMph>0 && wl.gustMph > wl.windMph*2.5 && (wl.gustMph - wl.windMph) > 18;
+      if(spike){ cond.gustMph = (modelGust!=null? modelGust : wl.windMph); cond.gustSuspect=wv(wl.gustMph); }
+      else cond.gustMph=wl.gustMph;
+    }
     if(wl.dir!=null)cond.windDir=wl.dir;
     cond.windSource="live"; cond.windStations=wl.stations||[]; cond.windAgeMin=wl.ageMin;
   }
@@ -687,7 +695,8 @@ function renderCards(){
   const dir=compass(COND.windDir);
   cards.push(card("Wind",wS(COND.windMph)+"<small> "+WUL+" "+dir+"</small>","Gusts "+wS(COND.gustMph)+" "+WUL+
     (COND.windSource==="live"?" · live from "+(COND.windStations?COND.windStations.length:1)+" nearby station"+((COND.windStations&&COND.windStations.length>1)?"s":""):"")+
-    (COND.windSheltered?" · harbor-adjusted (model reads "+wS(COND.windRaw)+" "+WUL+")":""),
+    (COND.windSheltered?" · harbor-adjusted (model reads "+wS(COND.windRaw)+" "+WUL+")":"")+
+    (COND.gustSuspect!=null?" · ignored a stuck "+Math.round(COND.gustSuspect)+" "+WUL+" gust spike (sensor) — showing model gust":""),
     COND.windSource==="live"?"live":(COND.windSheltered?"adj":"")));
   if(CFG.crew)cards.push(card("Visibility",COND.visMi!=null?(COND.visMi>=6?"Clear":COND.visMi.toFixed(1)+"<small> mi</small>"):"—",COND.visMi!=null&&COND.visMi<1?"⚠ fog — low visibility":"Fog/haze check"));
   if(COND.waveFt!=null)cards.push(card("Waves",round(COND.waveFt,1)+"<small> ft</small>",(COND.wavePeriod!=null?round(COND.wavePeriod)+"s swell":"")||"open-water est","est"));
