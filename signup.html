@@ -150,6 +150,11 @@
           <div class="spot" data-nm="Asharoken" data-lat="40.9085" data-lon="-73.3490"><span class="box"></span>⛵ Asharoken &amp; Centerport</div>
           <div class="spot" data-nm="Montauk" data-lat="41.0590" data-lon="-71.9545"><span class="box"></span>🎣 Montauk</div>
           <div class="spot" data-nm="Southold" data-lat="41.0640" data-lon="-72.4265"><span class="box"></span>🦪 Southold</div>
+          <div class="spot" data-nm="Jones Inlet" data-lat="40.5875" data-lon="-73.5677"><span class="box"></span>🎣 Jones Inlet</div>
+          <div class="spot" data-nm="Jones Beach" data-lat="40.5920" data-lon="-73.5100"><span class="box"></span>🎶 Jones Beach</div>
+          <div class="spot" data-nm="Robert Moses" data-lat="40.6200" data-lon="-73.2600"><span class="box"></span>🏖️ Robert Moses</div>
+          <div class="spot" data-nm="Sore Thumb" data-lat="40.6270" data-lon="-73.3080"><span class="box"></span>🛶 Sore Thumb</div>
+          <div class="spot" data-nm="Nissequogue River" data-lat="40.8850" data-lon="-73.2250"><span class="box"></span>🛶 Nissequogue River</div>
         </div>
 
         <div class="oror">or a custom spot</div>
@@ -237,7 +242,7 @@ function chosenSpots(){
 }
 function allTargets(){ const t=chosenSpots(); if(customTarget) t.push(customTarget); return t; }
 
-const DIRS={ "Oyster Bay":"ESE","Ocean Beach":"E","Asharoken":"NE","Montauk":"SE","Southold":"S" };
+const DIRS={ "Oyster Bay":"ESE","Ocean Beach":"E","Asharoken":"NE","Montauk":"SE","Southold":"S","Jones Inlet":"S","Jones Beach":"E","Robert Moses":"E","Sore Thumb":"NE","Nissequogue River":"N" };
 const CH_LABEL={ email:"Email", push:"Notification", sms:"SMS", telegram:"Telegram" };
 function updatePreview(){
   const t=allTargets(); const primary=t[0];
