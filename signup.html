@@ -24,7 +24,7 @@
   .card h2{margin:0 0 4px;font-size:1.15rem;color:var(--brand)}
   .card .lead{color:var(--muted);font-size:.9rem;margin-bottom:6px}
   label.fld{display:block;font-weight:700;font-size:.83rem;margin:18px 0 6px}
-  input[type=tel],input[type=text]{width:100%;font:inherit;font-size:1rem;padding:12px 14px;border:1.5px solid var(--line);border-radius:11px;background:#fbfdff}
+  input[type=tel],input[type=text],input[type=email]{width:100%;font:inherit;font-size:1rem;padding:12px 14px;border:1.5px solid var(--line);border-radius:11px;background:#fbfdff}
   input:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(27,152,201,.15)}
   .err-msg{color:var(--err);font-size:.78rem;margin-top:5px;min-height:1em}
   .spots{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px}
@@ -43,6 +43,20 @@
   .seg{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
   .seg button{font:inherit;font-size:.84rem;font-weight:700;padding:9px 13px;border-radius:10px;border:1.5px solid var(--line);background:#fbfdff;color:var(--ink);cursor:pointer}
   .seg button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  /* channel chooser */
+  .chans{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px}
+  @media(max-width:520px){.chans{grid-template-columns:1fr 1fr}}
+  .chan{display:flex;flex-direction:column;gap:2px;border:1.5px solid var(--line);border-radius:11px;padding:11px 13px;cursor:pointer;background:#fbfdff;transition:.15s;text-align:left}
+  .chan:hover{border-color:#cfe1ec}
+  .chan.on{border-color:var(--brand-2);background:#eef8fc;box-shadow:0 0 0 3px rgba(27,152,201,.12)}
+  .chan .t{font-weight:800;font-size:.92rem}
+  .chan .d{font-size:.72rem;color:var(--muted)}
+  .panel{display:none;margin-top:6px}
+  .panel.show{display:block}
+  .pushbtn,.tgbtn{display:inline-flex;align-items:center;gap:8px;font:inherit;font-weight:700;font-size:.9rem;padding:11px 16px;border-radius:11px;border:1.5px solid var(--brand-2);background:#eef8fc;color:var(--brand);cursor:pointer;text-decoration:none;margin-top:6px}
+  .pushbtn:disabled{filter:grayscale(.6) opacity(.7);cursor:default}
+  .note{font-size:.78rem;color:var(--muted);margin-top:8px}
+  .note b{color:var(--ink)}
   .consent{display:flex;gap:10px;align-items:flex-start;margin-top:20px;background:#f6fafc;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
   .consent input{margin-top:3px;transform:scale(1.15)}
   .consent label{font-size:.78rem;color:var(--muted)}
@@ -82,62 +96,97 @@
       <path d="M110 190 A60 60 0 0 1 230 190" fill="none" stroke="#8e44ad" stroke-width="12"/>
     </svg>
     <h1>🌈 Rainbow Alerts</h1>
-    <div class="sub">Get a text the moment conditions line up for a rainbow — sun low, showers around, clear line of sight to look.</div>
-    <span class="tag">Free · text STOP anytime</span>
+    <div class="sub">Get pinged the moment conditions line up for a rainbow — sun low, showers around, clear line of sight to look. Pick how you'd like to hear about it.</div>
+    <span class="tag">Free · opt out anytime</span>
   </div>
 
   <div class="grid">
     <div class="card">
       <h2>Sign up for alerts</h2>
-      <div class="lead">Pick one of our spots, or enter any US zip code.</div>
+      <div class="lead">Choose how you'd like to be notified, then pick your spots.</div>
 
-      <label class="fld" for="ph">Mobile number</label>
-      <input type="tel" id="ph" placeholder="(516) 555-0142" autocomplete="tel">
-      <div class="err-msg" id="ph-err"></div>
-
-      <label class="fld">Which spots?</label>
-      <div class="spots" id="spots">
-        <div class="spot" data-nm="Oyster Bay" data-lat="40.8757" data-lon="-73.5326"><span class="box"></span>🚣 Oyster Bay (Beekman)</div>
-        <div class="spot" data-nm="Ocean Beach" data-lat="40.6435" data-lon="-73.1548"><span class="box"></span>🏖️ Ocean Beach, Fire Is.</div>
-        <div class="spot" data-nm="Asharoken" data-lat="40.9085" data-lon="-73.3490"><span class="box"></span>⛵ Asharoken & Centerport</div>
-        <div class="spot" data-nm="Montauk" data-lat="41.0590" data-lon="-71.9545"><span class="box"></span>🎣 Montauk</div>
-        <div class="spot" data-nm="Southold" data-lat="41.0640" data-lon="-72.4265"><span class="box"></span>🦪 Southold</div>
+      <label class="fld">How should we reach you?</label>
+      <div class="chans" id="chans">
+        <div class="chan on" data-ch="email"><span class="t">✉️ Email</span><span class="d">Works everywhere, nothing to install</span></div>
+        <div class="chan" data-ch="push"><span class="t">🔔 Phone notification</span><span class="d">A push alert on your phone, no app</span></div>
+        <div class="chan" data-ch="telegram"><span class="t">✈️ Telegram</span><span class="d">Via our Telegram bot</span></div>
       </div>
 
-      <div class="oror">or a custom spot</div>
-      <label class="fld" for="zip">Zip code</label>
-      <div class="ziprow">
-        <input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="11771">
-        <button type="button" onclick="lookupZip()">Add</button>
-      </div>
-      <div class="err-msg" id="zip-err"></div>
-      <div class="zipok" id="zip-ok"></div>
-
-      <label class="fld">How eager are you?</label>
-      <div class="seg" id="seg">
-        <button type="button" data-maybe="0" class="on">Only strong odds</button>
-        <button type="button" data-maybe="1">Include “maybe” days</button>
+      <!-- EMAIL -->
+      <div class="panel show" data-panel="email">
+        <label class="fld" for="email">Email address</label>
+        <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+        <div class="err-msg" id="email-err"></div>
       </div>
 
-      <div class="consent">
-        <input type="checkbox" id="ok" checked>
-        <label for="ok">I agree to receive automated SMS rainbow alerts at the number above. Msg &amp; data rates may apply; frequency varies with the weather. Reply <b>STOP</b> to unsubscribe, <b>HELP</b> for help.</label>
+      <!-- SMS -->
+      <div class="panel" data-panel="sms">
+        <label class="fld" for="ph">Mobile number</label>
+        <input type="tel" id="ph" placeholder="(516) 555-0142" autocomplete="tel">
+        <div class="err-msg" id="ph-err"></div>
+        <div class="note">Standard message &amp; data rates may apply.</div>
       </div>
 
-      <button class="sub-btn" id="submit" onclick="submitForm()">Text me when there's a rainbow 🌈</button>
-      <div class="fine">We only use your number for these alerts. No sharing, no marketing. Quiet hours 10pm–6am.</div>
+      <!-- WEB PUSH -->
+      <div class="panel" data-panel="push">
+        <label class="fld">Enable notifications on this device</label>
+        <button type="button" class="pushbtn" id="pushbtn" onclick="enablePush()">🔔 Turn on notifications</button>
+        <div class="err-msg" id="push-err"></div>
+        <div class="note" id="push-note"><b>iPhone:</b> tap Share → <b>Add to Home Screen</b> first, then open it from that icon and turn on notifications. Android &amp; desktop work right here.</div>
+      </div>
+
+      <!-- TELEGRAM -->
+      <div class="panel" data-panel="telegram">
+        <label class="fld">Sign up in Telegram</label>
+        <a class="tgbtn" id="tgbtn" href="#" target="_blank" rel="noopener">✈️ Open the Rainbow Alerts bot</a>
+        <div class="note">The bot will ask which spot you want and handle the rest — you don't need this form for Telegram. Send <b>/stop</b> to the bot anytime to turn alerts off.</div>
+      </div>
+
+      <div id="spotsBlock">
+        <label class="fld">Which spots?</label>
+        <div class="spots" id="spots">
+          <div class="spot" data-nm="Oyster Bay" data-lat="40.8757" data-lon="-73.5326"><span class="box"></span>🚣 Oyster Bay (Beekman)</div>
+          <div class="spot" data-nm="Ocean Beach" data-lat="40.6435" data-lon="-73.1548"><span class="box"></span>🏖️ Ocean Beach, Fire Is.</div>
+          <div class="spot" data-nm="Asharoken" data-lat="40.9085" data-lon="-73.3490"><span class="box"></span>⛵ Asharoken &amp; Centerport</div>
+          <div class="spot" data-nm="Montauk" data-lat="41.0590" data-lon="-71.9545"><span class="box"></span>🎣 Montauk</div>
+          <div class="spot" data-nm="Southold" data-lat="41.0640" data-lon="-72.4265"><span class="box"></span>🦪 Southold</div>
+        </div>
+
+        <div class="oror">or a custom spot</div>
+        <label class="fld" for="zip">Zip code</label>
+        <div class="ziprow">
+          <input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="11771">
+          <button type="button" onclick="lookupZip()">Add</button>
+        </div>
+        <div class="err-msg" id="zip-err"></div>
+        <div class="zipok" id="zip-ok"></div>
+
+        <label class="fld">How eager are you?</label>
+        <div class="seg" id="seg">
+          <button type="button" data-maybe="0" class="on">Only strong odds</button>
+          <button type="button" data-maybe="1">Include “maybe” days</button>
+        </div>
+
+        <div class="consent">
+          <input type="checkbox" id="ok" checked>
+          <label for="ok" id="consent-label">I agree to receive automated rainbow alerts using the contact info above. Frequency varies with the weather. Opt out anytime.</label>
+        </div>
+
+        <button class="sub-btn" id="submit" onclick="submitForm()">Notify me when there's a rainbow 🌈</button>
+        <div class="fine">We only use your contact info for these alerts. No sharing, no marketing. Quiet hours 10pm–6am.</div>
+      </div>
       <div class="result" id="result"></div>
     </div>
 
     <div class="previewwrap">
-      <p class="phlabel">What the text looks like</p>
+      <p class="phlabel">What the alert looks like</p>
       <div class="phone"><div class="screen">
         <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
-        <div class="contact"><div class="av">🌈</div><div class="nm">Rainbow Alerts</div><div class="sub">SMS</div></div>
+        <div class="contact"><div class="av">🌈</div><div class="nm">Rainbow Alerts</div><div class="sub" id="pv-ch">Email</div></div>
         <div class="thread">
           <div class="tstamp">Today 6:18 PM</div>
           <div class="bubble">🌈 <b>Rainbow likely at <span id="loc">Oyster Bay</span> right now</b> — sun's low with showers around. Look <b id="dir">WSW</b> (away from the sun), next ~30 min.
-            <small>Reply STOP to end</small></div>
+            <small id="pv-foot">You signed up for Rainbow Alerts</small></div>
         </div>
       </div></div>
     </div>
@@ -146,16 +195,37 @@
 
 <script>
 /* ============================================================
-   CONFIG — set these when you wire the backend.
-   SIGNUP_ENDPOINT: a URL that accepts a POST {phone, includeMaybe, targets:[{label,lat,lon}]}
-                    (e.g. a Cloudflare Worker or Twilio Function that stores the subscriber).
-                    Leave "" to use the SMS-keyword fallback below instead.
-   TWILIO_NUMBER:   your Twilio sending number — used for the "text to sign up" fallback link.
+   CONFIG — fill these in when you wire the backend.
+   SIGNUP_ENDPOINT : Worker that stores subscribers (POST JSON, see below).
+   VAPID_PUBLIC_KEY: your Web-Push public key (from `npx web-push generate-vapid-keys`).
+                     Leave "" to hide/disable the web-push option.
+   TELEGRAM_BOT    : your bot's username WITHOUT the @ (e.g. "RainbowAlertsBot").
+                     Leave "" to hide the Telegram option.
+   The service worker file sw.js must be served from the SITE ROOT (same origin)
+   for web push to work.
    ============================================================ */
-const SIGNUP_ENDPOINT = "https://rainbow-signup.help-f0d.workers.dev/";  // your Cloudflare Worker
-const TWILIO_NUMBER   = "+12722003791";     // your Twilio number
+const SIGNUP_ENDPOINT  = "https://rainbow-signup.help-f0d.workers.dev/";
+const VAPID_PUBLIC_KEY = "";                 // <-- paste your VAPID public key
+const TELEGRAM_BOT     = "";                 // <-- e.g. "RainbowAlertsBot"
 
-let customTarget = null; // {label,lat,lon} from a zip lookup
+let channel = "email";
+let customTarget = null;      // {label,lat,lon} from a zip lookup
+let pushSubscription = null;  // set once the browser subscribes
+
+/* hide channels that aren't configured yet */
+if(!VAPID_PUBLIC_KEY){ const el=document.querySelector('.chan[data-ch="push"]'); if(el) el.style.display="none"; }
+if(!TELEGRAM_BOT){ const el=document.querySelector('.chan[data-ch="telegram"]'); if(el) el.style.display="none"; }
+else { document.getElementById('tgbtn').href = "https://t.me/" + TELEGRAM_BOT; }
+
+/* channel switching */
+document.querySelectorAll('.chan').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.chan').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); channel=c.dataset.ch;
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('show', p.dataset.panel===channel));
+  // Telegram is self-service through the bot → hide the spot/consent/submit block
+  document.getElementById('spotsBlock').style.display = (channel==="telegram") ? "none" : "";
+  updatePreview();
+}));
 
 document.querySelectorAll('.spot').forEach(s=>s.addEventListener('click',()=>{ s.classList.toggle('on'); updatePreview(); }));
 document.querySelectorAll('#seg button').forEach(b=>b.addEventListener('click',()=>{
@@ -168,10 +238,14 @@ function chosenSpots(){
 function allTargets(){ const t=chosenSpots(); if(customTarget) t.push(customTarget); return t; }
 
 const DIRS={ "Oyster Bay":"ESE","Ocean Beach":"E","Asharoken":"NE","Montauk":"SE","Southold":"S" };
+const CH_LABEL={ email:"Email", push:"Notification", sms:"SMS", telegram:"Telegram" };
 function updatePreview(){
   const t=allTargets(); const primary=t[0];
   document.getElementById('loc').textContent = primary ? primary.label : "your spot";
   document.getElementById('dir').textContent = primary ? (DIRS[primary.label]||"east") : "east";
+  document.getElementById('pv-ch').textContent = CH_LABEL[channel]||"Alert";
+  document.getElementById('pv-foot').textContent =
+    channel==="sms" ? "Reply STOP to end" : channel==="telegram" ? "Send /stop to end" : "You signed up for Rainbow Alerts";
 }
 
 async function lookupZip(){
@@ -191,45 +265,73 @@ async function lookupZip(){
   }catch(e){ err.textContent="Couldn't find that zip — double-check it."; }
 }
 
-function validPhone(v){ return /^\+?1?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}$/.test(v.trim()); }
+/* ---- web push subscribe ---- */
+function urlBase64ToUint8Array(base64String){
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw = atob(base64); const out = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+async function enablePush(){
+  const err=document.getElementById('push-err'), btn=document.getElementById('pushbtn');
+  err.textContent="";
+  if(!("serviceWorker" in navigator) || !("PushManager" in window)){
+    err.textContent="This browser doesn't support web push. Try email or SMS instead."; return;
+  }
+  try{
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    const perm = await Notification.requestPermission();
+    if(perm!=="granted"){ err.textContent="Notifications were blocked. Enable them for this site, or pick another channel."; return; }
+    pushSubscription = await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    btn.textContent="✓ Notifications on"; btn.disabled=true;
+  }catch(e){ err.textContent="Couldn't turn on notifications: "+e.message; }
+}
+
+function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||"").trim()); }
+function validPhone(v){ return /^\+?1?\s*\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}$/.test((v||"").trim()); }
 function e164(v){ let d=v.replace(/\D/g,""); if(d.length===10) d="1"+d; return "+"+d; }
 
 async function submitForm(){
-  const phEl=document.getElementById('ph'), phErr=document.getElementById('ph-err'), res=document.getElementById('result');
-  phErr.textContent=""; res.className="result";
-  if(!validPhone(phEl.value)){ phErr.textContent="Enter a valid US mobile number."; return; }
+  const res=document.getElementById('result'); res.className="result";
+  // contact validation per channel
+  let contactField={};
+  if(channel==="email"){
+    const el=document.getElementById('email'), er=document.getElementById('email-err'); er.textContent="";
+    if(!validEmail(el.value)){ er.textContent="Enter a valid email address."; return; }
+    contactField={ email: el.value.trim() };
+  } else if(channel==="sms"){
+    const el=document.getElementById('ph'), er=document.getElementById('ph-err'); er.textContent="";
+    if(!validPhone(el.value)){ er.textContent="Enter a valid US mobile number."; return; }
+    contactField={ phone: e164(el.value) };
+  } else if(channel==="push"){
+    if(!pushSubscription){ document.getElementById('push-err').textContent="Tap “Turn on notifications” first."; return; }
+    contactField={ push: pushSubscription };
+  }
+
   const targets=allTargets();
   if(!targets.length){ res.className="result warn show"; res.textContent="Pick at least one spot or add a zip code first."; return; }
-  if(!document.getElementById('ok').checked){ res.className="result warn show"; res.innerHTML="Please check the consent box so we're allowed to text you."; return; }
+  if(!document.getElementById('ok').checked){ res.className="result warn show"; res.textContent="Please check the consent box so we're allowed to alert you."; return; }
 
-  const payload={
-    phone: e164(phEl.value),
+  const payload={ channel, ...contactField,
     includeMaybe: document.querySelector('#seg button.on').dataset.maybe==="1",
-    targets
-  };
+    targets };
 
   const btn=document.getElementById('submit');
-  if(SIGNUP_ENDPOINT){
-    btn.disabled=true; btn.textContent="Signing you up…";
-    try{
-      const r=await fetch(SIGNUP_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-      if(!r.ok) throw new Error("HTTP "+r.status);
-      res.className="result ok show";
-      res.innerHTML=`🌈 You're in! We'll text ${payload.phone} when a rainbow is `+(payload.includeMaybe?"likely or possible":"likely")+` at ${targets.map(t=>t.label).join(", ")}. A welcome text should arrive shortly. Reply STOP anytime to opt out.`;
-      btn.textContent="Signed up ✓";
-    }catch(e){
-      res.className="result warn show"; btn.disabled=false; btn.textContent="Text me when there's a rainbow 🌈";
-      res.textContent="Hmm, that didn't go through. Please try again in a moment.";
-    }
-  } else {
-    // No backend wired yet → SMS-keyword fallback (works once the Twilio inbound webhook is set up)
-    const primary=targets[0];
-    const zipMatch=(primary.label.match(/\b(\d{5})\b/)||[])[1];
-    const body=`RAINBOW ${zipMatch||primary.label}`;
-    const smsHref=`sms:${TWILIO_NUMBER}?&body=${encodeURIComponent(body)}`;
-    res.className="result warn show";
-    res.innerHTML=`Signups aren't connected to the server yet. In the meantime you can subscribe by text: `+
-      `<a href="${smsHref}">tap here to text “${body}” to ${TWILIO_NUMBER}</a>, or set <code>SIGNUP_ENDPOINT</code> in this file to go fully automatic.`;
+  btn.disabled=true; btn.textContent="Signing you up…";
+  try{
+    const r=await fetch(SIGNUP_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const how = channel==="email" ? "email you" : channel==="sms" ? "text you" : "send you a notification";
+    res.className="result ok show";
+    res.innerHTML=`🌈 You're in! We'll ${how} when a rainbow is `+(payload.includeMaybe?"likely or possible":"likely")+` at ${targets.map(t=>t.label).join(", ")}.`;
+    btn.textContent="Signed up ✓";
+  }catch(e){
+    res.className="result warn show"; btn.disabled=false; btn.textContent="Notify me when there's a rainbow 🌈";
+    res.textContent="Hmm, that didn't go through. Please try again in a moment.";
   }
 }
 updatePreview();
