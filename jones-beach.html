@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/favicon.ico?v=1">
+<link rel="icon" type="image/png" href="assets/favicon.png?v=1">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
+<title>Jones Beach — Beach &amp; Concert Weather</title>
+<link rel="stylesheet" href="assets/conditions.css?v=20260828">
+<style>:root{--brand:#123c73;--brand-2:#2f7bd1}</style>
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Jones Beach",
+  tagline: "Beach days and evening-concert weather for Jones Beach — ocean side and the amphitheater on Zachs Bay.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  pollen: "https://costal-data.help-f0d.workers.dev/pollen",
+  astro: true,
+  waterQualityLink: "https://www.dec.ny.gov/outdoor/91887.html",
+  waterQualityLabel: "NY DEC beach advisories",
+  footNote: "Heading to a show at the amphitheater? It's open-air on the bay, so check two things below before you go: the 'Raining now / next' line at the top (radar nowcast for the next few hours) and the wind — bay breezes pick up after sunset. Sunset and golden-hour times are in the Sky section. Ocean swell and water temp are open-Atlantic model values.",
+  spots: [
+    { id:"theater", name:"Jones Beach Theater (Zachs Bay)", lat:40.6033, lon:-73.5107, marine:true, sheltered:true,
+      tideStation:"8516385",
+      note:"The Northwell Health amphitheater on Zachs Bay — open to the sky and the water. For showtime, watch the rain nowcast and the evening wind. Bring a layer; it cools off over the bay after dark." },
+    { id:"ocean", name:"Jones Beach (ocean)", lat:40.5900, lon:-73.5100, marine:true, surf:true,
+      tideStation:"8516385",
+      note:"The main ocean strand — swimming, beach walks, biking the boardwalk, and sandcastles. South-facing Atlantic, so real surf and rip currents; heed the flags." }
+  ],
+  activities: ["swim","beachday","beachwalk","surf","bike","kite","sandcastle","party","gamenight","dolphin"]
+};
+</script>
+<script src="assets/conditions.js?v=20260828"></script>
+</body>
+</html>

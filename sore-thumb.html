@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/favicon.ico?v=1">
+<link rel="icon" type="image/png" href="assets/favicon.png?v=1">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
+<title>Sore Thumb — Paddle &amp; Bay Conditions</title>
+<link rel="stylesheet" href="assets/conditions.css?v=20260828">
+<style>:root{--brand:#0f5b52;--brand-2:#1fb39a}</style>
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Sore Thumb",
+  tagline: "Paddle and bay conditions at Sore Thumb — SUP and kayak out to the sandbar in the middle of the bay.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  pollen: "https://costal-data.help-f0d.workers.dev/pollen",
+  astro: true,
+  waterQualityLink: "https://www.dec.ny.gov/outdoor/91887.html",
+  waterQualityLabel: "NY DEC advisories",
+  footNote: "The big sandbar out in the bay is the whole draw — it's widest and driest around low tide and washes over near high, so check the Tides panel before you go. Sheltered bay water reads calm here; wind is the better guide than wave height. Tide timing is from the Fire Island Inlet station and runs a little later inside the bay.",
+  spots: [
+    { id:"sorethumb", name:"Sore Thumb (bay launch)", lat:40.6270, lon:-73.3080, marine:true, sheltered:true,
+      tideStation:"8515228",
+      note:"Launch on the calm bay side. From here it's a short SUP or kayak of roughly half a mile out to the sandbar — head north / northeast into the flats. Best on a light wind; a south breeze pushes you toward the channel." },
+    { id:"sandbar", name:"The sandbar (bay flats)", lat:40.6335, lon:-73.3040, marine:true, sheltered:true,
+      tideStation:"8515228",
+      note:"The classic mid-bay sandbar — a place to stand, wade and hang out. Exposed and biggest near low tide; it can wash over around high. Watch boat traffic in the nearby channel." }
+  ],
+  activities: ["sup","kayak","swim","efoil","beachday","fish","sail","dolphin"]
+};
+</script>
+<script src="assets/conditions.js?v=20260828"></script>
+</body>
+</html>

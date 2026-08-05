@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/favicon.ico?v=1">
+<link rel="icon" type="image/png" href="assets/favicon.png?v=1">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
+<title>Robert Moses Beach — Ocean Conditions</title>
+<link rel="stylesheet" href="assets/conditions.css?v=20260828">
+<style>:root{--brand:#0b466b;--brand-2:#1e8fca}</style>
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Robert Moses Beach",
+  tagline: "Ocean conditions at Robert Moses State Park — swim, surf and beach days at the west end of Fire Island, plus fishing by the inlet.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  pollen: "https://costal-data.help-f0d.workers.dev/pollen",
+  astro: true,
+  waterQualityLink: "https://www.dec.ny.gov/outdoor/91887.html",
+  waterQualityLabel: "NY DEC beach advisories",
+  footNote: "South-facing Atlantic beach — real surf, swell and rip currents, so heed the lifeguard flags and swim near a guarded field. Ocean swell and water temp come from open-Atlantic models (reliable here). Tides are from the Fire Island Inlet (Democrat Point) station.",
+  spots: [
+    { id:"ocean", name:"Robert Moses (ocean)", lat:40.6200, lon:-73.2600, marine:true, surf:true,
+      tideStation:"8515228",
+      note:"The open ocean strand across the fields — swimming, surfing, beach walks and sandcastles. Watch for rip currents, especially on a dropping tide." },
+    { id:"inlet", name:"Fire Island Inlet / Lighthouse (fishing)", lat:40.6270, lon:-73.2620, marine:true,
+      tideStation:"8515228",
+      note:"The inlet end by the lighthouse — surfcasting for stripers, blues and fluke. The current runs hard through the inlet; fish the tide changes and mind your footing." }
+  ],
+  activities: ["swim","surf","beachday","beachwalk","sup","fish","sandcastle","kite","dolphin"],
+  fishing: {
+    link: "https://dec.ny.gov/things-to-do/saltwater-fishing/recreational-fishing-regulations",
+    note: "Fire Island Inlet off Robert Moses is prime surfcasting — striped bass and bluefish on the spring and fall runs, fluke and sea bass through the summer, and false albacore blitzes in early fall.",
+    season: ["fluke","seabass","scup","bass","bluefish","weakfish","tautog"],
+    run: ["albie","snapper"]
+  }
+};
+</script>
+<script src="assets/conditions.js?v=20260828"></script>
+</body>
+</html>
