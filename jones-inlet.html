@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="assets/favicon.ico?v=1">
+<link rel="icon" type="image/png" href="assets/favicon.png?v=1">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
+<title>Jones Inlet — Boating &amp; Fishing Conditions</title>
+<link rel="stylesheet" href="assets/conditions.css?v=20260828">
+<style>:root{--brand:#0e4a5e;--brand-2:#1f9bb3}</style>
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+window.SPOT_CONFIG = {
+  pageTitle: "Jones Inlet",
+  tagline: "Boating and fishing conditions for Jones Inlet and the South Oyster Bay back bay — ocean approach and sheltered water.",
+  tz: "America/New_York",
+  radarStation: "KOKX",
+  pollen: "https://costal-data.help-f0d.workers.dev/pollen",
+  astro: true,
+  waterQualityLink: "https://www.dec.ny.gov/outdoor/91887.html",
+  waterQualityLabel: "NY DEC beach/shellfish advisories",
+  footNote: "South-shore conditions around Jones Inlet. Ocean-side swell and water temp come from open-Atlantic models (reliable here); water temp is a modeled estimate for this spot. Tides are from the Jones Inlet (Point Lookout) station. Watch wind against tide at the inlet — an outgoing tide against a south wind stands the rips up fast.",
+  spots: [
+    { id:"inlet", name:"Jones Inlet (ocean approach & channel)", lat:40.5875, lon:-73.5677, marine:true,
+      tideStation:"8516385",
+      note:"The inlet and channel out to the Atlantic — the hub for boating and fishing. Fluke and sea bass in summer, a strong spring and fall striped bass run, and bluefish blitzes. Mind the bar and the rips on an outgoing tide against a south wind." },
+    { id:"southbay", name:"South Oyster Bay (back bay)", lat:40.6180, lon:-73.5150, marine:true, sheltered:true,
+      tideStation:"8516385",
+      note:"Sheltered water behind the barrier beach — calmer boating, fluke and snappers, crabbing and clam flats. Flattens fast when the wind lays down." }
+  ],
+  activities: ["boat","fish","sup","kayak","efoil","swim"],
+  fishing: {
+    link: "https://dec.ny.gov/things-to-do/saltwater-fishing/recreational-fishing-regulations",
+    note: "Jones Inlet is a south-shore boating and fishing hub — summer fluke and sea bass, porgies, a strong spring and fall striped bass run, and bluefish blitzes off the beach. False albacore and snapper blues show late summer into fall; blue crab fills the back bays.",
+    season: ["fluke","seabass","scup","bass","bluefish","weakfish","tautog"],
+    run: ["albie","snapper","crab"]
+  }
+};
+</script>
+<script src="assets/conditions.js?v=20260828"></script>
+</body>
+</html>
