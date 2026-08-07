@@ -303,7 +303,32 @@ async function fetchSpot(spot){
       }
     }catch(e){fails.push("Tides: "+e.message);}
   }
-  return {wx,aq,mar,waterF,waterSrc,waterEst,tide,tideEvents,windLive};
+  // USGS river gauge (inland spots): live streamflow + gauge height, the hyper-local kayak read
+  let river=null;
+  if(spot.riverGauge&&spot.riverGauge.site){
+    try{
+      const d=await getJSON("https://waterservices.usgs.gov/nwis/iv/?format=json&sites="+encodeURIComponent(spot.riverGauge.site)+
+        "&parameterCd=00060,00065,00010&siteStatus=all");
+      river=parseUSGS(d,spot.riverGauge);
+    }catch(e){fails.push("River gauge: "+e.message);}
+  }
+  return {wx,aq,mar,waterF,waterSrc,waterEst,tide,tideEvents,windLive,river};
+}
+/* Parse USGS Instantaneous-Values JSON → latest discharge (cfs), gauge height (ft), water temp (°F). */
+function parseUSGS(j,cfg){
+  const ts=(j&&j.value&&j.value.timeSeries)||[];
+  const out={site:cfg.site,name:cfg.name||"River gauge",link:cfg.link||null,flowCfs:null,gaugeFt:null,waterF:null,when:null};
+  for(const s of ts){
+    const code=s.variable&&s.variable.variableCode&&s.variable.variableCode[0]&&s.variable.variableCode[0].value;
+    const v=s.values&&s.values[0]&&s.values[0].value&&s.values[0].value[0];
+    if(!v||v.value==null)continue;
+    const val=parseFloat(v.value);
+    if(isNaN(val)||val<=-999999)continue;
+    if(code==="00060"){out.flowCfs=val; out.when=v.dateTime;}
+    else if(code==="00065"){out.gaugeFt=val; if(!out.when)out.when=v.dateTime;}
+    else if(code==="00010"){out.waterF=val*9/5+32;}   // USGS reports °C
+  }
+  return (out.flowCfs!=null||out.gaugeFt!=null)?out:null;
 }
 
 function deriveNow(data,spot){
@@ -686,11 +711,25 @@ function renderCrew(a){
 }
 function renderCards(){
   const g=$("#grid"); if(!COND){g.innerHTML="<span class='err'>Unavailable.</span>";return;}
+  const spot=CFG.spots[ACTIVE];
   const cards=[];
   const card=(lbl,val,meta,est)=>`<div class="card">${est?'<span class="est">'+est+'</span>':''}<div class="lbl">${lbl}</div><div class="val">${val}</div>${meta?'<div class="meta">'+meta+'</div>':''}</div>`;
   let waterMeta=DATA.waterSrc||"";
   if(CFG.crew){ const cw=coldWater(COND.waterF); if(cw&&cw.lv==="poor")waterMeta="⚠ cold — flip = hypothermia risk"; else if(cw&&cw.lv==="fair")waterMeta="cool — dress for immersion"; }
-  cards.push(card("Water temp",COND.waterF!=null?round(COND.waterF)+"<small>°F</small>":"—",waterMeta,DATA.waterEst?"est":""));
+  const riverTemp=(DATA.river&&DATA.river.waterF!=null)?DATA.river.waterF:null;
+  const wF=COND.waterF!=null?COND.waterF:riverTemp;
+  // skip the water-temp card entirely for inland spots with no water-temp source
+  if(wF!=null||spot.marine||spot.waterTempStation)
+    cards.push(card("Water temp",wF!=null?round(wF)+"<small>°F</small>":"—",(wF===riverTemp&&riverTemp!=null)?"USGS river gauge":waterMeta,(DATA.waterEst&&COND.waterF!=null)?"est":""));
+  // USGS river gauge — live streamflow + gauge height, the hyper-local kayak read
+  if(DATA.river){
+    const rv=DATA.river, gg=spot.riverGauge||{};
+    const flow=rv.flowCfs!=null?Math.round(rv.flowCfs):null;
+    const lo=gg.low!=null?gg.low:60, hi=gg.high!=null?gg.high:1200;
+    let read=""; if(flow!=null) read=flow<lo?"low — likely scrapey":flow>hi?"running high — pushy, scout it":"good paddling flow";
+    const bits=[]; if(rv.gaugeFt!=null)bits.push("gauge "+rv.gaugeFt.toFixed(2)+" ft"); if(read)bits.push(read);
+    cards.push(card("River flow",flow!=null?flow+"<small> cfs</small>":(rv.gaugeFt!=null?rv.gaugeFt.toFixed(2)+"<small> ft</small>":"—"),bits.join(" · ")||rv.name,"live"));
+  }
   cards.push(card("Air temp",round(COND.airF)+"<small>°F</small>","Feels "+round(COND.feelsF)+"° · "+(WMO[COND.code]||"")));
   const dir=compass(COND.windDir);
   cards.push(card("Wind",wS(COND.windMph)+"<small> "+WUL+" "+dir+"</small>","Gusts "+wS(COND.gustMph)+" "+WUL+
