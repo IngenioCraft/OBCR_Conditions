@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/favicon.png?v=1">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <title>Boonville — Kayak &amp; Bike Conditions</title>
-<link rel="stylesheet" href="assets/conditions.css?v=20260829">
+<link rel="stylesheet" href="assets/conditions.css?v=20260830">
 <style>:root{--brand:#2f5d34;--brand-2:#5aa64a}</style>
 <!-- Privacy-friendly analytics by Plausible -->
 <script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
@@ -26,6 +26,20 @@ window.SPOT_CONFIG = {
   radarStation: "KTYX",
   pollen: "https://costal-data.help-f0d.workers.dev/pollen",
   astro: true,
+  natureRegion: "Adirondack foothills / Tug Hill",
+  wildlife: [
+    { emoji:"🐸", name:"Spring peepers", from:"03-25", to:"05-20", note:"evening frog chorus from the wetlands and river edges" },
+    { emoji:"🌸", name:"Trilliums &amp; trout lily", from:"04-25", to:"05-25", note:"woodland wildflowers carpeting the forest floor" },
+    { emoji:"🦟", name:"Black flies", from:"05-10", to:"06-20", note:"peak black-fly season — a head net helps on the river" },
+    { emoji:"✨", name:"Fireflies", from:"06-01", to:"07-20", note:"flickering over the fields and riverbanks after dusk" },
+    { emoji:"🐟", name:"Trout", from:"04-01", to:"10-15", note:"brook &amp; brown trout in the cold-water streams; best early and late in the day" },
+    { emoji:"🦫", name:"Beavers &amp; otters", from:"04-01", to:"11-15", note:"working the river and backwaters at dawn and dusk" },
+    { emoji:"🦆", name:"Common loons", from:"05-01", to:"10-01", note:"calling from nearby ponds and quiet flows, especially at dusk" },
+    { emoji:"🍂", name:"Fall foliage", from:"09-20", to:"10-15", note:"hardwoods turning — peak color late September into early October" },
+    { emoji:"🦌", name:"White-tailed deer", from:"09-15", to:"12-15", note:"moving at dawn and dusk; the rut peaks in November" },
+    { emoji:"🦅", name:"Bald eagles", from:"12-01", to:"03-15", note:"fishing the open stretches of the Black River through winter" },
+    { emoji:"❄️", name:"Lake-effect snow", from:"11-20", to:"03-15", note:"Tug Hill is among the snowiest places in the East" }
+  ],
   waterQualityLink: "https://waterdata.usgs.gov/monitoring-location/USGS-04252500/",
   waterQualityLabel: "USGS Black River gauge data",
   footNote: "The River-flow card is the live USGS gauge on the Black River near Boonville — streamflow in cubic feet per second (cfs) and gauge height in feet, the numbers paddlers watch. As a rough guide, very low flows get scrapey and very high flows run fast and pushy; the runnable range depends on the stretch, so treat the label as a hint and scout for yourself. It reads high for a day or two after heavy rain or snowmelt. Biking is on the roads and the Black River Canal towpath / Erie Canalway trail. (Inland spot — no tides or surf.)",
@@ -35,9 +49,9 @@ window.SPOT_CONFIG = {
         link:"https://waterdata.usgs.gov/monitoring-location/USGS-04252500/", low:60, high:1200 },
       note:"Paddling and riding around Boonville on the Black River and the old canal corridor. Check the live River-flow card before you launch, and the wind and rain nowcast before a ride. It's Tug Hill country — showers roll through fast." }
   ],
-  activities: ["kayak","bike","sup","fish","swim","beachwalk"]
+  activities: ["kayak","bike","sup","fish","swim"]
 };
 </script>
-<script src="assets/conditions.js?v=20260829"></script>
+<script src="assets/conditions.js?v=20260830"></script>
 </body>
 </html>
