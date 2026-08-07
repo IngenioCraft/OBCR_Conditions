@@ -1279,9 +1279,10 @@ function daysUntilMD(md){ const now=new Date(),y=now.getFullYear(),p=md.split("-
   let d=new Date(y,+p[0]-1,+p[1]); if(d<now)d=new Date(y+1,+p[0]-1,+p[1]); return Math.round((d-now)/86400000); }
 function wildlifeNow(){
   const t=todayMD();
-  const active=WILDLIFE.filter(m=>inRange(t,m.from,m.to));
+  const LIST=(CFG.wildlife&&CFG.wildlife.length)?CFG.wildlife:WILDLIFE;
+  const active=LIST.filter(m=>inRange(t,m.from,m.to));
   let html=active.slice(0,5).map(m=>`${m.emoji} <b>${m.name}</b> — ${m.note}`).join("<br>");
-  const up=WILDLIFE.filter(m=>!inRange(t,m.from,m.to)).map(m=>({m,d:daysUntilMD(m.from)})).sort((a,b)=>a.d-b.d)[0];
+  const up=LIST.filter(m=>!inRange(t,m.from,m.to)).map(m=>({m,d:daysUntilMD(m.from)})).sort((a,b)=>a.d-b.d)[0];
   if(up&&up.d<45) html+=(html?"<br>":"")+`<span style="color:var(--muted)">Coming up: ${up.m.emoji} ${up.m.name} around ${fmtMD(up.m.from)}.</span>`;
   return html||"Quiet season — check back as spring warms up.";
 }
@@ -1335,12 +1336,16 @@ function stargazeHTML(){
 }
 function renderNature(){
   const box=$("#nature"); if(!box||!COND)return; const c=COND, parts=[];
+  const spot=CFG.spots[ACTIVE];
+  const coastal=!!(spot.marine||spot.surf||spot.tideStation);   // horseshoe crabs / jellyfish are tidewater-only
   const gh=goldenHourHTML(c); if(gh)parts.push(`<div class="detail"><b>🌅 Golden hour:</b> ${gh}</div>`);
   const sg=stargazeHTML(); if(sg)parts.push(`<div class="detail" style="margin-top:10px"><b>🔭 Stargazing:</b> ${sg}</div>`);
-  const hc=horseshoeHTML(); if(hc)parts.push(`<div class="detail" style="margin-top:10px"><b>🦀 Horseshoe crabs:</b> ${hc}</div>`);
-  const jf=jellyfishHTML(c); if(jf)parts.push(`<div class="detail" style="margin-top:10px"><b>🪼 Jellyfish:</b> ${jf}</div>`);
+  if(coastal){
+    const hc=horseshoeHTML(); if(hc)parts.push(`<div class="detail" style="margin-top:10px"><b>🦀 Horseshoe crabs:</b> ${hc}</div>`);
+    const jf=jellyfishHTML(c); if(jf)parts.push(`<div class="detail" style="margin-top:10px"><b>🪼 Jellyfish:</b> ${jf}</div>`);
+  }
   parts.push(`<div class="detail" style="margin-top:10px"><b>🌿 In season now:</b><br>${wildlifeNow()}</div>`);
-  parts.push(`<div class="detail" style="margin-top:10px;font-style:italic">Seasonal notes are general Long Island guidance — wildlife timing shifts year to year.</div>`);
+  parts.push(`<div class="detail" style="margin-top:10px;font-style:italic">Seasonal notes are general ${CFG.natureRegion||"Long Island"} guidance — wildlife timing shifts year to year.</div>`);
   box.innerHTML=parts.join("");
 }
 function renderPollen(){
