@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/favicon.png?v=1">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <title>Nissequogue River — Kayak &amp; Paddle Conditions</title>
-<link rel="stylesheet" href="assets/conditions.css?v=20260829">
+<link rel="stylesheet" href="assets/conditions.css?v=20260910">
 <style>:root{--brand:#155e52;--brand-2:#2aa88a}</style>
 <!-- Privacy-friendly analytics by Plausible -->
 <script async src="https://plausible.io/js/pa-aEGyIuuZri2SU6_Wl9iC2.js"></script>
@@ -31,12 +31,23 @@ window.SPOT_CONFIG = {
   footNote: "Which way to paddle: the Nissequogue is tidal, so let the current do the work. On an INCOMING (flood) tide the water runs upstream — south, inland toward Smithtown. On the OUTGOING (ebb) tide it runs downstream — north, toward the river mouth at Short Beach and Long Island Sound. Easiest trip: put in about 1–2 hours before high tide, ride the last of the flood upstream, then turn and let the ebb carry you back down. Rule of thumb — paddle against the current on the way out so you finish the tired leg with it. Use the Tides panel below to see whether it's rising or falling and when the next high/low is.",
   spots: [
     { id:"river", name:"Nissequogue River (tidal)", lat:40.8850, lon:-73.2250, marine:true, sheltered:true,
-      tideStation:"8515102",
+      tideStation:"8515586",
+      tidePlan:{
+        days:7,
+        highLaunch:"Kings Park Bluff or Nissequogue River State Park (river mouth)",
+        highNote:"the flood carries you upriver toward Smithtown, turn around at high tide, and the ebb carries you back to the Sound",
+        lowLaunch:"Paul T. Given Park (Smithtown, upriver end)",
+        lowNote:"the ebb carries you downriver toward the Sound, turn around at low tide, and the flood carries you back upriver",
+        oneWay:{
+          high:{from:"Nissequogue River State Park (mouth)", to:"the head of the river at the Smithtown Bull (Paul T. Given Park)"},
+          low:{from:"the head of the river at the Smithtown Bull (Paul T. Given Park)", to:"Nissequogue River State Park (mouth)"}
+        }
+      },
       note:"Sheltered tidal river — calm, scenic paddling with ospreys and herons. Go upstream (south) on the flood, back downstream (north) to the Sound on the ebb. Time it with the tide and you'll barely have to work; fight it and it's a slog. Wind on the open lower river can still kick up a chop." }
   ],
   activities: ["kayak","sup","fish","swim","boat"]
 };
 </script>
-<script src="assets/conditions.js?v=20260829"></script>
+<script src="assets/conditions.js?v=20260910"></script>
 </body>
 </html>
