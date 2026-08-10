@@ -193,6 +193,30 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 .tide-item{font-size:.8rem;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 9px}
 .tide-item b.hi{color:var(--brand-2)} .tide-item b.lo{color:var(--muted)}
 
+/* multi-day tide table + round-trip kayak planner (spots with tidePlan) */
+.tideplan{width:100%;display:grid;gap:10px}
+.tp-day{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow)}
+.tp-hd{font-weight:800;font-size:.92rem;color:var(--brand);margin-bottom:4px}
+.tp-tag{font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#fff;background:var(--brand-2);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle}
+.tp-row{display:grid;grid-template-columns:180px 1fr;gap:6px 12px;align-items:center;padding:9px 6px;border-top:1px dashed var(--line)}
+.tp-row.next{background:#eaf5fb;border-radius:10px;border-top-color:transparent}
+.tp-tide{display:flex;align-items:center;gap:9px}
+.tp-arrow{font-size:1.05rem;line-height:1}
+.tp-tide.hi .tp-arrow,.tp-tide.hi .tp-td b{color:var(--brand-2)}
+.tp-tide.lo .tp-arrow,.tp-tide.lo .tp-td b{color:var(--muted)}
+.tp-td b{display:block;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.tp-time{font-size:1.08rem;font-weight:800;color:var(--ink)}
+.tp-ht{font-size:.78rem;color:var(--muted)}
+.tp-kayak{font-size:.82rem;color:var(--muted);line-height:1.45}
+.tp-kayak b{color:var(--ink)}
+.tp-kayak.dark{opacity:.72}
+.tp-oneway{margin-top:5px;padding-top:5px;border-top:1px dotted var(--line)}
+.tp-night{color:var(--fair);font-weight:600}
+.tp-note{font-size:.78rem;color:var(--muted);padding:2px 4px;line-height:1.5}
+@media(max-width:540px){.tp-row{grid-template-columns:1fr;gap:3px}}
+body.eink .tp-day{box-shadow:none;border:2px solid #000}
+body.eink .tp-row.next{background:#eee}
+
 /* ferries */
 .ferries{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:6px}
 .ferry{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow)}
