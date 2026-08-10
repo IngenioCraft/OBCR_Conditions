@@ -1380,10 +1380,19 @@ function renderTidePlan(box,ev,plan){
   const lead=(plan.leadMin!=null?plan.leadMin:120)*60000;
   const daily=DATA.wx&&DATA.wx.daily;
   const dayKey=d=>new Intl.DateTimeFormat("en-CA",{timeZone:TZ}).format(d);
-  const sunFor=d=>{ if(!daily||!daily.time)return null; const k=dayKey(d);
-    for(let i=0;i<daily.time.length;i++){ if(dayKey(new Date(daily.time[i]*1000))===k)
-      return{sr:new Date(daily.sunrise[i]*1000),ss:new Date(daily.sunset[i]*1000)}; }
-    return null; };
+  // daylight check: a trip only gets suggested if it starts AND ends inside
+  // sunrise−30min .. sunset+30min. Sun times come from the forecast day matching the
+  // event (fall back to the last forecast day — sunrise drifts ~1 min/day).
+  const minOfDay=d=>{const p=new Intl.DateTimeFormat("en-US",{timeZone:TZ,hour12:false,hour:"2-digit",minute:"2-digit"}).formatToParts(d);
+    const g=t=>+p.find(x=>x.type===t).value; return (g("hour")%24)*60+g("minute");};
+  const sunMinFor=d=>{ if(!daily||!daily.time||!daily.time.length)return null;
+    const k=dayKey(d); let i=daily.time.length-1;
+    for(let j=0;j<daily.time.length;j++){ if(dayKey(new Date(daily.time[j]*1000))===k){i=j;break;} }
+    return{sr:minOfDay(new Date(daily.sunrise[i]*1000)),ss:minOfDay(new Date(daily.sunset[i]*1000))}; };
+  const GRACE=30;
+  const daylight=(a,b)=>{ const s=sunMinFor(a); if(!s)return true;
+    const ok=m=>m>=s.sr-GRACE&&m<=s.ss+GRACE;
+    return ok(minOfDay(a))&&ok(minOfDay(b)); };
   const now=new Date();
   const todayK=dayKey(now), tomorrowK=dayKey(new Date(Date.now()+86400000));
   const future=ev.filter(e=>e.t>new Date(Date.now()-3600000));
@@ -1398,29 +1407,31 @@ function renderTidePlan(box,ev,plan){
       d.items.map(e=>{
         const hi=e.type==="H";
         const launch=new Date(e.t.getTime()-lead), ret=new Date(e.t.getTime()+lead);
-        const sun=sunFor(e.t);
-        const dark=sun?(launch<new Date(sun.sr.getTime()-30*60000)||ret>new Date(sun.ss.getTime()+30*60000)):false;
         const site=hi?(plan.highLaunch||"the downriver launch"):(plan.lowLaunch||"the upriver launch");
         const how=hi?(plan.highNote||"the flood carries you upriver, turn around at high tide, and the ebb carries you home")
                     :(plan.lowNote||"the ebb carries you downriver, turn around at low tide, and the flood carries you home");
+        const lines=[];
+        if(daylight(launch,ret))
+          lines.push('<div class="tp-trip">🛶 <b>Round trip: launch ~'+fmtTime(launch)+'</b> from '+site+' — '+how+'. Back ~'+fmtTime(ret)+'.</div>');
         // one-way shuttle option: ride the whole rising (or falling) tide end-to-end,
         // starting ~3h before the turn so the current runs your way the entire trip
-        let oneway="";
         const ow=plan.oneWay&&(hi?plan.oneWay.high:plan.oneWay.low);
         if(ow){
           const owStart=new Date(e.t.getTime()-((plan.oneWay.leadMin!=null?plan.oneWay.leadMin:180)*60000));
-          oneway='<div class="tp-oneway">🚙 <b>One-way '+(hi?"upriver":"downriver")+':</b> start ~'+fmtTime(owStart)+' at '+ow.from+
-            ' — the '+(hi?"rising":"falling")+' tide carries you the whole way; take out at '+ow.to+'.</div>';
+          if(daylight(owStart,e.t))
+            lines.push('<div class="tp-trip">🚙 <b>One-way '+(hi?"upriver":"downriver")+':</b> start ~'+fmtTime(owStart)+' at '+ow.from+
+              ' — the '+(hi?"rising":"falling")+' tide carries you the whole way; take out at '+ow.to+'.</div>');
         }
+        if(!lines.length)
+          lines.push('<div class="tp-trip"><span class="tp-night">🌙 after dark — no daylight trip on this tide</span></div>');
         return '<div class="tp-row'+(next&&e.t.getTime()===next.t.getTime()?' next':'')+'">'+
           '<div class="tp-tide '+(hi?"hi":"lo")+'"><span class="tp-arrow">'+(hi?"▲":"▼")+'</span><div class="tp-td">'+
             '<b>'+(hi?"High":"Low")+'</b><span class="tp-time">'+fmtTime(e.t)+'</span> <span class="tp-ht">'+round(e.v,1)+' ft</span></div></div>'+
-          '<div class="tp-kayak'+(dark?' dark':'')+'">🛶 <b>Round trip: launch ~'+fmtTime(launch)+'</b> from '+site+' — '+how+'. Back ~'+fmtTime(ret)+'.'+
-            (dark?' <span class="tp-night">🌙 dark for part of this trip — pick a daylight tide</span>':'')+oneway+'</div>'+
+          '<div class="tp-kayak">'+lines.join("")+'</div>'+
         '</div>';
       }).join("")+'</div>';
   }).join("")+
-  '<div class="tp-note"><b>Round trips</b>: launch about 2 hours <b>before</b> the tide shown, so the current carries you out, you turn around at slack, and the reversing tide brings you home — you never fight a strong tide. <b>One-way trips</b> ride a single tide end-to-end: leave a car at the take-out (or arrange a pickup) before you start. The turn happens a bit later the farther upriver you are, which works in your favor on the return leg.</div></div>';
+  '<div class="tp-note"><b>Round trips</b>: launch about 2 hours <b>before</b> the tide shown, so the current carries you out, you turn around at slack, and the reversing tide brings you home — you never fight a strong tide. <b>One-way trips</b> ride a single tide end-to-end: leave a car at the take-out (or arrange a pickup) before you start. Trips that would start or end in the dark aren\'t suggested. The tide turn happens a bit later the farther upriver you are, which works in your favor on the return leg.</div></div>';
 }
 
 function loadRadar(){

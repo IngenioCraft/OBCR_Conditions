@@ -209,9 +209,8 @@ h2{font-size:1rem;color:var(--brand);margin:26px 0 4px;font-weight:700;scroll-ma
 .tp-ht{font-size:.78rem;color:var(--muted)}
 .tp-kayak{font-size:.82rem;color:var(--muted);line-height:1.45}
 .tp-kayak b{color:var(--ink)}
-.tp-kayak.dark{opacity:.72}
-.tp-oneway{margin-top:5px;padding-top:5px;border-top:1px dotted var(--line)}
-.tp-night{color:var(--fair);font-weight:600}
+.tp-trip+.tp-trip{margin-top:5px;padding-top:5px;border-top:1px dotted var(--line)}
+.tp-night{color:var(--muted);font-weight:600;font-style:italic}
 .tp-note{font-size:.78rem;color:var(--muted);padding:2px 4px;line-height:1.5}
 @media(max-width:540px){.tp-row{grid-template-columns:1fr;gap:3px}}
 body.eink .tp-day{box-shadow:none;border:2px solid #000}
