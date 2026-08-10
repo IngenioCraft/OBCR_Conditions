@@ -287,12 +287,13 @@ async function fetchSpot(spot){
   if(waterF==null&&mar&&mar.current&&mar.current.sea_surface_temperature!=null){
     waterF=mar.current.sea_surface_temperature; waterSrc="Modeled estimate"; waterEst=true;
   }
-  // tides
+  // tides — default 48h; spots with a tidePlan (7-day kayak planner) pull the full window
   let tide=null, tideEvents=[];
   if(spot.tideStation){
     try{
       const beg=ymdET();
-      const d=await getJSON("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date="+beg+"&range=48&station="+
+      const rangeH=(spot.tidePlan&&spot.tidePlan.days)?spot.tidePlan.days*24:48;
+      const d=await getJSON("https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date="+beg+"&range="+rangeH+"&station="+
         spot.tideStation+"&product=predictions&datum=MLLW&interval=hilo&units=english&time_zone=gmt&format=json&application=coastal-conditions");
       if(d&&d.predictions&&d.predictions.length){
         const now=new Date();
@@ -1363,9 +1364,63 @@ function renderPollen(){
 function renderTides(){
   const t=$("#tides"); const ev=DATA&&DATA.tideEvents;
   if(!ev||!ev.length){t.innerHTML="<span class='err'>Tide data unavailable.</span>";return;}
+  const spot=CFG.spots[ACTIVE];
+  if(spot.tidePlan){renderTidePlan(t,ev,spot.tidePlan);return;}
   const now=new Date(Date.now()-3600000);
   t.innerHTML=ev.filter(e=>e.t>now).slice(0,8).map(e=>{const cls=e.type==="H"?"hi":"lo",lab=e.type==="H"?"High":"Low";
     return `<div class="tide-item"><b class="${cls}">${lab}</b> ${fmtTime(e.t)} · ${round(e.v,1)} ft</div>`;}).join("");
+}
+/* Multi-day tide table with a round-trip kayak plan beside each tide.
+   Out-and-back on a tidal river: launch ~2h BEFORE the tide turn so the current carries
+   you out, turn around at slack, and the reversing tide carries you home — never against
+   a strong tide, and the tired leg is the assisted one.
+   High tide → start at the DOWNRIVER launch (flood pushes you upriver, ebb brings you back).
+   Low tide  → start at the UPRIVER launch (ebb pushes you downriver, flood brings you back). */
+function renderTidePlan(box,ev,plan){
+  const lead=(plan.leadMin!=null?plan.leadMin:120)*60000;
+  const daily=DATA.wx&&DATA.wx.daily;
+  const dayKey=d=>new Intl.DateTimeFormat("en-CA",{timeZone:TZ}).format(d);
+  const sunFor=d=>{ if(!daily||!daily.time)return null; const k=dayKey(d);
+    for(let i=0;i<daily.time.length;i++){ if(dayKey(new Date(daily.time[i]*1000))===k)
+      return{sr:new Date(daily.sunrise[i]*1000),ss:new Date(daily.sunset[i]*1000)}; }
+    return null; };
+  const now=new Date();
+  const todayK=dayKey(now), tomorrowK=dayKey(new Date(Date.now()+86400000));
+  const future=ev.filter(e=>e.t>new Date(Date.now()-3600000));
+  const next=future.find(e=>e.t>now);
+  const days=[];
+  for(const e of future){ const k=dayKey(e.t); let d=days[days.length-1];
+    if(!d||d.k!==k){ d={k,t:e.t,items:[]}; days.push(d); } d.items.push(e); }
+  const fmtDayHd=d=>d.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric",timeZone:TZ});
+  box.innerHTML='<div class="tideplan">'+days.map(d=>{
+    const tag=d.k===todayK?"Today":(d.k===tomorrowK?"Tomorrow":"");
+    return '<div class="tp-day"><div class="tp-hd">'+fmtDayHd(d.t)+(tag?' <span class="tp-tag">'+tag+'</span>':'')+'</div>'+
+      d.items.map(e=>{
+        const hi=e.type==="H";
+        const launch=new Date(e.t.getTime()-lead), ret=new Date(e.t.getTime()+lead);
+        const sun=sunFor(e.t);
+        const dark=sun?(launch<new Date(sun.sr.getTime()-30*60000)||ret>new Date(sun.ss.getTime()+30*60000)):false;
+        const site=hi?(plan.highLaunch||"the downriver launch"):(plan.lowLaunch||"the upriver launch");
+        const how=hi?(plan.highNote||"the flood carries you upriver, turn around at high tide, and the ebb carries you home")
+                    :(plan.lowNote||"the ebb carries you downriver, turn around at low tide, and the flood carries you home");
+        // one-way shuttle option: ride the whole rising (or falling) tide end-to-end,
+        // starting ~3h before the turn so the current runs your way the entire trip
+        let oneway="";
+        const ow=plan.oneWay&&(hi?plan.oneWay.high:plan.oneWay.low);
+        if(ow){
+          const owStart=new Date(e.t.getTime()-((plan.oneWay.leadMin!=null?plan.oneWay.leadMin:180)*60000));
+          oneway='<div class="tp-oneway">🚙 <b>One-way '+(hi?"upriver":"downriver")+':</b> start ~'+fmtTime(owStart)+' at '+ow.from+
+            ' — the '+(hi?"rising":"falling")+' tide carries you the whole way; take out at '+ow.to+'.</div>';
+        }
+        return '<div class="tp-row'+(next&&e.t.getTime()===next.t.getTime()?' next':'')+'">'+
+          '<div class="tp-tide '+(hi?"hi":"lo")+'"><span class="tp-arrow">'+(hi?"▲":"▼")+'</span><div class="tp-td">'+
+            '<b>'+(hi?"High":"Low")+'</b><span class="tp-time">'+fmtTime(e.t)+'</span> <span class="tp-ht">'+round(e.v,1)+' ft</span></div></div>'+
+          '<div class="tp-kayak'+(dark?' dark':'')+'">🛶 <b>Round trip: launch ~'+fmtTime(launch)+'</b> from '+site+' — '+how+'. Back ~'+fmtTime(ret)+'.'+
+            (dark?' <span class="tp-night">🌙 dark for part of this trip — pick a daylight tide</span>':'')+oneway+'</div>'+
+        '</div>';
+      }).join("")+'</div>';
+  }).join("")+
+  '<div class="tp-note"><b>Round trips</b>: launch about 2 hours <b>before</b> the tide shown, so the current carries you out, you turn around at slack, and the reversing tide brings you home — you never fight a strong tide. <b>One-way trips</b> ride a single tide end-to-end: leave a car at the take-out (or arrange a pickup) before you start. The turn happens a bit later the farther upriver you are, which works in your favor on the return leg.</div></div>';
 }
 
 function loadRadar(){
