@@ -733,7 +733,7 @@ function renderCrewSummary(s,spot){
   const trend=windTrend();
   s.innerHTML=`<div class="pill">OBCR crew conditions</div>`+
     `<div class="headline">${head}</div>`+
-    `<div class="line">Wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b>, gusting <b>${wS(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
+    `<div class="line">Wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b>, gusting <b>${wS(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F${COND.wbgtF!=null?` · WBGT ~<b>${Math.round(COND.wbgtF)}°F</b> <span class="srcinline">est</span>`:""}.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
     precipLineHTML()+
     (trend?`<div class="line">${trend}</div>`:"");
 }
