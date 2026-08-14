@@ -1,0 +1,42 @@
+[
+  {
+    "id": "jeff-oysterbay",
+    "channel": "email",
+    "email": "jeff@belaray.com",
+    "label": "Oyster Bay",
+    "lat": 40.8757,
+    "lon": -73.5326,
+    "includeMaybe": false,
+    "active": true
+  },
+  {
+    "id": "sus4-oceanbeach",
+    "channel": "email",
+    "email": "sus_4@hotmail.com",
+    "label": "Ocean Beach",
+    "lat": 40.6435,
+    "lon": -73.1548,
+    "includeMaybe": false,
+    "active": true
+  },
+  {
+    "id": "ethan-oceanbeach",
+    "channel": "email",
+    "email": "Ethan.Falkove@nb.com",
+    "label": "Ocean Beach",
+    "lat": 40.6435,
+    "lon": -73.1548,
+    "includeMaybe": false,
+    "active": true
+  },
+  {
+    "id": "amy-asharoken",
+    "channel": "email",
+    "email": "amy.slear@gmail.com",
+    "label": "Asharoken",
+    "lat": 40.9085,
+    "lon": -73.3490,
+    "includeMaybe": false,
+    "active": true
+  }
+]

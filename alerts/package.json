@@ -1,0 +1,15 @@
+{
+  "name": "rainbow-alerts",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Rainbow alert watcher — emails, web push, Telegram, or SMS when a rainbow is likely.",
+  "scripts": {
+    "watch": "node rainbow-watch.mjs",
+    "test": "node test-watch.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.0",
+    "web-push": "^3.6.0"
+  }
+}

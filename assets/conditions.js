@@ -19,7 +19,11 @@ const T = {
   swimWarm:70, swimOK:62, swimCold:56, swimWavePoor:4, swimWaveFair:2,
   surfMin:1.5, surfGoodLo:3, surfGoodHi:7, surfBig:10, surfPeriodGood:7,
   rainRecentAdvise:0.75, rainRecentWatch:0.3,  // inches in last 24h -> bacteria risk
-  uvHigh:6, uvVery:8, uvExtreme:11
+  uvHigh:6, uvVery:8, uvExtreme:11,
+  /* OBCR official guidelines (°F) — cold-weather matrix + WBGT heat limits */
+  rowWaterNoGo:50,      // water < 50 → NO-GO
+  rowAirWaterFull:90,   // water ≥ 50 AND air+water ≥ 90 → full go; < 90 → 4-oar restrictions
+  wbgtCaution:77, wbgtRestrict:82, wbgtNoGo:90
 };
 
 /* ---------- helpers ---------- */
@@ -51,10 +55,35 @@ function uvProtect(u){ if(u==null)return""; if(u<3)return"Low — sunscreen opti
 function uvBurn(u){ if(u==null||u<1)return null; return Math.max(5,Math.round(80/u)); } // ~min to burn, unprotected fair skin
 function aqiCat(a){ if(a==null)return""; if(a<=50)return"Good"; if(a<=100)return"Moderate"; if(a<=150)return"Unhealthy (sensitive)"; if(a<=200)return"Unhealthy"; if(a<=300)return"Very unhealthy"; return"Hazardous"; }
 /* crew helpers */
-function coldWater(f){ if(f==null)return null;
-  if(f<50)return{lv:"poor",msg:"Cold water ("+round(f)+"°F) — flip = hypothermia risk. Follow cold-water rules: PFDs, hug the shore, short pieces, launch on the water."};
-  if(f<60)return{lv:"fair",msg:"Cool water ("+round(f)+"°F) — dress for immersion; extra caution with novice crews."};
-  return{lv:"good",msg:"Water "+round(f)+"°F — normal precautions."}; }
+/* OBCR cold-weather matrix: water < 50°F → NO-GO; water ≥ 50 but air+water < 90 → go with
+   restrictions (4-oar rule); water ≥ 50 and air+water ≥ 90 → full go. */
+function coldWater(f,airF){ if(f==null)return null;
+  if(f<T.rowWaterNoGo)return{lv:"poor",msg:"NO-GO — water "+round(f)+"°F is below the "+T.rowWaterNoGo+"°F minimum (OBCR cold-weather rule). Flip = hypothermia risk."};
+  if(airF!=null&&(f+airF)<T.rowAirWaterFull)return{lv:"fair",msg:"Restrictions — water "+round(f)+"° + air "+round(airF)+"° = "+round(f+airF)+" (< "+T.rowAirWaterFull+"). OBCR 4-oar rule applies; dress for immersion."};
+  if(f<60)return{lv:"good",msg:"Full go per OBCR (water ≥ 50°, air + water ≥ 90°) — still cool water ("+round(f)+"°F), dress for immersion."};
+  return{lv:"good",msg:"Water "+round(f)+"°F — full go (water ≥ 50°, air + water ≥ 90°)."}; }
+/* Estimated WBGT for the OBCR heat rules. True WBGT needs a black-globe sensor; this is the standard
+   outdoor estimate WBGT = 0.7·Twb + 0.2·Tg + 0.1·Ta, with Twb from the Stull (2011) wet-bulb formula
+   (air temp + humidity) and globe temp Tg estimated from solar radiation & wind (~+23°F over air in
+   calm full sun, less when windy; = air temp at night). Clearly labeled an estimate in the UI. */
+function wetBulbF(airF,rh){
+  if(airF==null||rh==null)return null;
+  const t=(airF-32)*5/9;
+  const twb=t*Math.atan(0.151977*Math.sqrt(rh+8.313659))+Math.atan(t+rh)-Math.atan(rh-1.676331)
+    +0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh)-4.686035;
+  return twb*9/5+32;
+}
+function wbgtF(airF,rh,solar,windMph){
+  const twb=wetBulbF(airF,rh); if(twb==null)return null;
+  const S=(solar==null||isNaN(solar))?0:Math.max(0,solar);
+  const tg=airF+(S/1000)*(23-0.7*Math.min(windMph||0,20));  // °F globe excess vs air
+  return 0.7*twb+0.2*tg+0.1*airF;
+}
+function heatStatus(w){ if(w==null)return null; const v=Math.round(w);
+  if(w>=T.wbgtNoGo)return{lv:"poor",msg:"WBGT ~"+v+"°F — NO-GO (≥ "+T.wbgtNoGo+"°F, OBCR heat rule). Off the water."};
+  if(w>=T.wbgtRestrict)return{lv:"poor",msg:"WBGT ~"+v+"°F — HIGH RISK ("+T.wbgtRestrict+"–89°F, OBCR): cut intensity, shorten pieces, mandatory water breaks."};
+  if(w>=T.wbgtCaution)return{lv:"fair",msg:"WBGT ~"+v+"°F — caution ("+T.wbgtCaution+"–"+(T.wbgtRestrict-1)+"°F): extra hydration & rest breaks."};
+  return{lv:"good",msg:"WBGT ~"+v+"°F — no heat restriction."}; }
 function fogStatus(mi){ if(mi==null)return null;
   if(mi<0.5)return{lv:"poor",msg:"Dense fog (~"+mi.toFixed(1)+" mi vis) — high collision risk with powerboats. Not advisable."};
   if(mi<1)return{lv:"fair",msg:"Reduced visibility (~"+mi.toFixed(1)+" mi) — fog risk, stay near shore and alert."};
@@ -256,7 +285,7 @@ function beachFirmSand(c){
 async function fetchSpot(spot){
   const {lat,lon}=spot;
   const wxU="https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+
-    "&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index,cloud_cover"+
+    "&current=temperature_2m,apparent_temperature,relative_humidity_2m,shortwave_radiation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index,cloud_cover"+
     "&minutely_15=temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code"+
     "&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,uv_index,visibility,cloud_cover"+
     "&daily=sunrise,sunset,uv_index_max,precipitation_sum&timeformat=unixtime&past_days=1&forecast_days=7"+
@@ -403,6 +432,8 @@ function deriveNow(data,spot){
   // real rain-gauge accumulation today (only where a live station reports it, e.g. Sagamore)
   if(wl&&wl.rain!=null&&!isNaN(+wl.rain)){ cond.gaugeRain=+wl.rain; cond.gaugeRainUnit=wl.rainUnits||"in";
     cond.gaugeRainSrc=spot.windSourceName||(wl.stations&&wl.stations[0])||"gauge"; }
+  // estimated WBGT for the OBCR heat rules (uses model wind — computed from ambient conditions)
+  cond.wbgtF=wbgtF(c.temperature_2m,c.relative_humidity_2m,c.shortwave_radiation,c.wind_speed_10m);
   // water-quality assessment (rain runoff based)
   cond.wq=assessWQ(cond,spot);
   return cond;
@@ -664,7 +695,8 @@ function crewItems(c){
   if(c.windMph>16)add("water","poor","Water surface","🌊","Whitecaps / rough water");
   else if(c.windMph>11)add("water","fair","Water surface","🌊","Chop building");
   else add("water","good","Water surface","🌊","Calm — good set");
-  const cw=coldWater(c.waterF); if(cw)add("coldwater",cw.lv,"Cold water","🥶",cw.msg);
+  const cw=coldWater(c.waterF,c.airF); if(cw)add("coldwater",cw.lv,"Cold water","🥶",cw.msg,"OBCR cold-weather guideline");
+  const ht=heatStatus(c.wbgtF); if(ht)add("heat",ht.lv,"Heat (WBGT)","🥵",ht.msg,"OBCR heat guideline · WBGT estimated from air temp, humidity, sun & wind");
   const fg=fogStatus(c.visMi); if(fg)add("visibility",fg.lv,"Visibility","🌫️",fg.msg);
   if(isStorm(c.code))add("lightning","storm","Lightning","⛈️","Thunderstorms — off the water now");
   else add("lightning","good","Lightning","⛈️","No storms nearby");
@@ -681,19 +713,21 @@ function renderCrewSummary(s,spot){
   let head;
   if(items.some(i=>i.lv==="storm")) head="Off the water — thunderstorms";
   else if(lv==="poor"){
-    const prio=["daylight","visibility","wind","water","gusts","coldwater"];
+    const prio=["daylight","coldwater","heat","visibility","wind","water","gusts"];
     const drv=prio.map(k=>items.find(i=>i.key===k&&i.lv==="poor")).find(Boolean);
     const k=drv?drv.key:"";
     head = k==="daylight" ? "Wait for daylight — too dark now"
+         : k==="coldwater" ? "No-go — water below 50°F (cold-weather rule)"
+         : k==="heat" ? (COND.wbgtF>=T.wbgtNoGo?"Off the water — heat no-go (WBGT ≥ 90°F)":"High risk — heat limits (WBGT)")
          : k==="visibility" ? "Not advisable — fog / low visibility"
-         : k==="coldwater" ? "Cold water — take cold-water precautions"
          : "Not advisable — too rough";
-  } else if(lv==="fair") head="Row with caution";
+  } else if(lv==="fair") head=items.some(i=>i.key==="coldwater"&&i.lv==="fair")?"Go with restrictions — 4-oar rule":"Row with caution";
   else head="Good to row";
   s.className="summary lv-"+lv;
   const dir=compass(COND.windDir), flags=[];
-  const cw=coldWater(COND.waterF), fg=fogStatus(COND.visMi);
-  if(cw&&cw.lv!=="good")flags.push(cw.lv==="poor"?"cold water "+round(COND.waterF)+"°":"cool water "+round(COND.waterF)+"°");
+  const cw=coldWater(COND.waterF,COND.airF), ht=heatStatus(COND.wbgtF), fg=fogStatus(COND.visMi);
+  if(cw&&cw.lv!=="good")flags.push(cw.lv==="poor"?"cold water "+round(COND.waterF)+"° — no-go":"4-oar rule (air+water "+round(COND.waterF+COND.airF)+"°)");
+  if(ht&&ht.lv!=="good")flags.push("heat — WBGT ~"+Math.round(COND.wbgtF)+"°");
   if(fg&&fg.lv!=="good")flags.push(fg.lv==="poor"?"dense fog":"fog risk");
   if(!COND.isDay)flags.push("dark now");
   const trend=windTrend();
@@ -716,7 +750,7 @@ function renderCards(){
   const cards=[];
   const card=(lbl,val,meta,est)=>`<div class="card">${est?'<span class="est">'+est+'</span>':''}<div class="lbl">${lbl}</div><div class="val">${val}</div>${meta?'<div class="meta">'+meta+'</div>':''}</div>`;
   let waterMeta=DATA.waterSrc||"";
-  if(CFG.crew){ const cw=coldWater(COND.waterF); if(cw&&cw.lv==="poor")waterMeta="⚠ cold — flip = hypothermia risk"; else if(cw&&cw.lv==="fair")waterMeta="cool — dress for immersion"; }
+  if(CFG.crew){ const cw=coldWater(COND.waterF,COND.airF); if(cw&&cw.lv==="poor")waterMeta="⚠ below 50°F — OBCR no-go"; else if(cw&&cw.lv==="fair")waterMeta="4-oar rule — air+water < 90°F"; }
   const riverTemp=(DATA.river&&DATA.river.waterF!=null)?DATA.river.waterF:null;
   const wF=COND.waterF!=null?COND.waterF:riverTemp;
   // skip the water-temp card entirely for inland spots with no water-temp source
@@ -739,6 +773,8 @@ function renderCards(){
     (COND.gustSuspect!=null?" · ignored a stuck "+Math.round(COND.gustSuspect)+" "+WUL+" gust spike (sensor) — showing model gust":""),
     COND.windSource==="live"?"live":(COND.windSheltered?"adj":"")));
   if(CFG.crew)cards.push(card("Visibility",COND.visMi!=null?(COND.visMi>=6?"Clear":COND.visMi.toFixed(1)+"<small> mi</small>"):"—",COND.visMi!=null&&COND.visMi<1?"⚠ fog — low visibility":"Fog/haze check"));
+  if(CFG.crew&&COND.wbgtF!=null){ const ht=heatStatus(COND.wbgtF);
+    cards.push(card("WBGT",round(COND.wbgtF)+"<small>°F</small>",ht.lv==="good"?"No heat restriction":(COND.wbgtF>=T.wbgtNoGo?"⚠ heat NO-GO (≥ 90°F)":COND.wbgtF>=T.wbgtRestrict?"⚠ HIGH RISK 82–89°F":"Caution 77–81°F — hydrate"),"est")); }
   if(COND.waveFt!=null)cards.push(card("Waves",round(COND.waveFt,1)+"<small> ft</small>",(COND.wavePeriod!=null?round(COND.wavePeriod)+"s swell":"")||"open-water est","est"));
   const uvB=uvBurn(COND.uv);
   const uvMeta=COND.uv!=null?((uvB?"Burns in ~"+uvB+" min · ":"")+uvProtect(COND.uv)):"";
