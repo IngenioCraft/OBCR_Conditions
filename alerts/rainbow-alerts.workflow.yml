@@ -1,0 +1,91 @@
+# ============================================================
+# Rainbow Alerts — scheduled watcher
+# Copy this file to .github/workflows/rainbow-alerts.yml in your PRIVATE repo.
+#
+# Add whichever channel secrets you use under Settings → Secrets and variables → Actions.
+# You only need the secrets for the channels you actually send on — the rest can be blank.
+#
+#   Email (SMTP):   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+#   Web push:       VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
+#   Telegram:       TELEGRAM_BOT_TOKEN
+#   SMS (Twilio):   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID
+#
+# Set the repo VARIABLE DRY_RUN=0 (Settings → Variables) to send for real; leave it 1 to test safely.
+# ============================================================
+name: Rainbow Alerts
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+    inputs:
+      test_email:
+        description: "Send one test email to this address and exit"
+        required: false
+      test_to:
+        description: "Send one test SMS to this +1 number and exit"
+        required: false
+      test_telegram:
+        description: "Send one test Telegram message to this chat id and exit"
+        required: false
+
+concurrency:
+  group: rainbow-alerts
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # so the job can commit updated state.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        working-directory: alerts
+        run: npm install --no-audit --no-fund
+
+      - name: Run rainbow watcher
+        working-directory: alerts
+        env:
+          DRY_RUN: ${{ vars.DRY_RUN || '1' }}
+          COOLDOWN_HOURS: ${{ vars.COOLDOWN_HOURS || '2' }}
+          QUIET_START: ${{ vars.QUIET_START || '22' }}
+          QUIET_END: ${{ vars.QUIET_END || '6' }}
+          ALERT_TZ: ${{ vars.ALERT_TZ || 'America/New_York' }}
+          # one-off test inputs (only set when you run it manually)
+          TEST_EMAIL: ${{ github.event.inputs.test_email }}
+          TEST_TO: ${{ github.event.inputs.test_to }}
+          TEST_TELEGRAM: ${{ github.event.inputs.test_telegram }}
+          # email
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          # web push
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          # telegram
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          # sms (optional)
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM: ${{ secrets.TWILIO_FROM }}
+          TWILIO_MESSAGING_SERVICE_SID: ${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}
+        run: node rainbow-watch.mjs
+
+      - name: Persist alert state
+        run: |
+          if ! git diff --quiet -- alerts/state.json; then
+            git config user.name "rainbow-bot"
+            git config user.email "rainbow-bot@users.noreply.github.com"
+            git add alerts/state.json
+            git commit -m "update alert state [skip ci]"
+            git push
+          fi
