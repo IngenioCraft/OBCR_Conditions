@@ -48,18 +48,29 @@ window.SPOT_CONFIG = {
       windSourceName:"Sagamore YC harbor station",
       note:"Theodore Roosevelt / Beekman Beach, Oyster Bay. Water temp is live from the Kings Point sensor." }
   ],
-  // Live harbor cam. Sagamore Yacht Club looks over Oyster Bay harbor — the closest public
+  // Live cams. Sagamore Yacht Club looks over Oyster Bay harbor — the closest public
   // view to the rowing water (no camera is pointed at Beekman Beach itself).
-  liveCam: {
-    label: "Oyster Bay harbor",
-    credit: "Sagamore Yacht Club",
-    embed: "https://live3.brownrice.com/embed/sagamoreyc",
-    link: "https://live3.brownrice.com/embed/sagamoreyc",
-    flag: true,
-    note: "Live look at Oyster Bay harbor from the Sagamore Yacht Club — the nearest public camera to the rowing water (not Beekman Beach itself)."
-  }
+  liveCams: [
+    {
+      label: "Oyster Bay harbor",
+      credit: "Sagamore Yacht Club",
+      embed: "https://live3.brownrice.com/embed/sagamoreyc",
+      link: "https://live3.brownrice.com/embed/sagamoreyc",
+      flag: true,
+      note: "Live look at Oyster Bay harbor from the Sagamore Yacht Club, right by the rowing water — the osprey cam below sits nearly next door for a second angle."
+    },
+    {
+      // Nesting platform beside the Frank M. Flower & Sons oyster house, 2 Bayview Ave —
+      // nearly adjacent to the Beekman Beach launch (and the Sagamore cam), ~0.3 mi along the shore.
+      label: "Osprey Cam · Theodore Roosevelt Beach",
+      credit: "PSEG Long Island — Osprey Project",
+      embed: "https://www.youtube.com/embed/ZzW9-t5bYJE",
+      link: "https://www.youtube.com/watch?v=ZzW9-t5bYJE",
+      note: "Live 4K osprey nest cam beside the Frank M. Flower & Sons oyster house on Bayview Ave — nearly adjacent to the Beekman Beach launch, so the water and sky behind the nest are the rowing water itself."
+    }
+  ]
 };
 </script>
-<script src="assets/conditions.js?v=20260829"></script>
+<script src="assets/conditions.js?v=20260830"></script>
 </body>
 </html>

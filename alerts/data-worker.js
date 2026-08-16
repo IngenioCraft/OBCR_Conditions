@@ -6,13 +6,20 @@
      GET /pollen?lat=..&lon=..                  → Google Pollen API (compact summary)
      GET /wind?lat=..&lon=..&radius=6           → Synoptic Data, nearby stations averaged
      GET /wind?stations=STID1,STID2             → (optional) explicit Synoptic station IDs
+     GET /windlog?days=14                       → logged live-vs-model wind samples (calibration)
 
    Set these (Worker → Settings → Variables and Secrets):
      GOOGLE_POLLEN_KEY  (secret)  a Google Cloud key with the Pollen API enabled
      SYNOPTIC_TOKEN     (secret)  a free Synoptic Data API token (synopticdata.com)
      ALLOW_ORIGIN       (var)     https://prey.tel
 
-   Nothing here is stored; keys never leave the Worker.
+   WIND CALIBRATION LOGGING (optional, for tuning the harbor-shelter model):
+     1. Storage & Databases → KV → create a namespace (e.g. "wind-log").
+     2. Worker → Settings → Bindings → add KV binding named  WIND_LOG  → that namespace.
+     3. Worker → Settings → Triggers → add Cron Trigger:  0,15,30,45 * * * *
+     Every 15 min the Worker stores {live Sagamore reading, Open-Meteo model} pairs
+     (only when both report). ~96 KV writes/day — well inside the free tier. Entries
+     expire after 90 days. Analyze with alerts/wind-calibrate.mjs.
    ============================================================ */
 
 const FRESH_MIN = 35;      // a PWS reading older than this (minutes) is treated as stale
@@ -29,14 +36,55 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     try {
       if (url.pathname === "/wind")   return json(await getWind(url, env), 200, cors);
+      if (url.pathname === "/windlog") return json(await getWindLog(url, env), 200, cors);
       if (url.pathname === "/pollen") return json(await getPollen(url, env, ctx), 200, cors);
-      if (url.pathname === "/")       return json({ ok: true, routes: ["/wind", "/pollen"] }, 200, cors);
+      if (url.pathname === "/")       return json({ ok: true, routes: ["/wind", "/windlog", "/pollen"] }, 200, cors);
       return json({ error: "Not found" }, 404, cors);
     } catch (e) {
       return json({ error: String(e && e.message || e) }, 502, cors);
     }
   },
+  // Cron trigger (see header): sample live station vs model for shelter-model calibration.
+  async scheduled(event, env, ctx) { ctx.waitUntil(logWindSample(env)); },
 };
+
+/* ---------------- WIND CALIBRATION LOG ---------------- */
+// The spot the shelter model is tuned for (Beekman Beach) and its live station's embed token.
+const CAL_SPOT = { lat: 40.8767, lon: -73.5413, weatherlink: "e9aef99860fc4aecb73f08d0d9cb3e37" };
+
+async function logWindSample(env) {
+  if (!env.WIND_LOG) return; // KV binding not configured — logging disabled
+  const [live, wxr] = await Promise.all([
+    getWeatherLink(env.WEATHERLINK_TOKEN || CAL_SPOT.weatherlink).catch(() => null),
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CAL_SPOT.lat}&longitude=${CAL_SPOT.lon}`
+      + `&current=wind_speed_10m,wind_gusts_10m,wind_direction_10m&wind_speed_unit=mph&cell_selection=land`)
+      .then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+  // only log ticks where BOTH sides reported — a one-sided sample can't calibrate anything
+  if (!live || !live.fresh || !wxr || !wxr.current || wxr.current.wind_speed_10m == null) return;
+  const m = wxr.current;
+  const rec = { t: Date.now(), lw: live.windMph, lg: live.gustMph, ld: live.dir,
+                mw: m.wind_speed_10m, mg: m.wind_gusts_10m, md: m.wind_direction_10m };
+  const key = "log:" + new Date().toISOString().slice(0, 10);
+  const cur = (await env.WIND_LOG.get(key, "json")) || [];
+  cur.push(rec);
+  await env.WIND_LOG.put(key, JSON.stringify(cur), { expirationTtl: 90 * 24 * 3600 });
+}
+
+async function getWindLog(url, env) {
+  if (!env.WIND_LOG) return { error: "WIND_LOG KV binding not set — see setup comment at top of worker" };
+  const days = Math.min(90, Math.max(1, +(url.searchParams.get("days") || 14)));
+  const out = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const arr = await env.WIND_LOG.get("log:" + d, "json");
+    if (arr) out.push(...arr);
+  }
+  out.sort((a, b) => a.t - b.t);
+  return { ok: true, count: out.length,
+    fields: "t=ms epoch · lw/lg/ld=live wind/gust/dir · mw/mg/md=model wind/gust/dir (mph, °)",
+    samples: out };
+}
 
 /* ---------------- WIND ---------------- */
 async function getWind(url, env) {
