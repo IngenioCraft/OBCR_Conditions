@@ -683,6 +683,33 @@ function windTrend(){
   return`<b>→ Holding steady</b> for the next few hours.`;
 }
 
+/* When it's dark, look ahead to the NEXT sunrise and read the forecast for that hour, so the
+   banner can say when rowing opens up and what the wind is predicted to be. Applies the same
+   directional-shelter trim as the live model, plus the OBCR cold-weather check with the
+   forecast air temp at sunrise. */
+function sunriseOutlook(spot){
+  const wx=DATA&&DATA.wx; if(!wx||!wx.daily||!wx.daily.sunrise||!wx.hourly)return null;
+  const now=new Date();
+  let sr=null;
+  for(let i=0;i<wx.daily.sunrise.length;i++){const d=new Date(wx.daily.sunrise[i]*1000); if(d>now){sr=d;break;}}
+  if(!sr)return null;
+  const h=wx.hourly;
+  let idx=h.time.findIndex(t=>t*1000>=sr.getTime()); if(idx<0)return null;
+  let w=h.wind_speed_10m[idx], g=h.wind_gusts_10m[idx];
+  const dir=h.wind_direction_10m?h.wind_direction_10m[idx]:null, code=h.weather_code?h.weather_code[idx]:0;
+  const airAt=h.temperature_2m?h.temperature_2m[idx]:null;
+  if(spot&&spot.shelter&&dir!=null){const f=shelterFactor(dir,spot.shelter.open,spot.shelter.min);
+    w=w*f; if(g!=null)g=g*(1-(1-f)*0.5);}
+  const cw=coldWater(COND?COND.waterF:null,airAt);
+  let word;
+  if(isStorm(code)) word="⛈️ but thunderstorms are forecast then — check again";
+  else if(cw&&cw.lv==="poor") word="but water is below 50°F — cold-weather NO-GO regardless of light";
+  else if(w>16||g>23) word="likely still too rough";
+  else if(w>10||g>17) word="rowable with caution";
+  else if(cw&&cw.lv==="fair") word="good to row — 4-oar rule (air + water < 90°F)";
+  else word="looks good to row";
+  return {sr,w,g,dir,word};
+}
 function crewItems(c){
   const items=[]; const add=(key,lv,label,ico,why,tag)=>items.push({key,lv,label,ico,why,tag});
   const src=c.windLabel;
@@ -735,7 +762,8 @@ function renderCrewSummary(s,spot){
     `<div class="headline">${head}</div>`+
     `<div class="line">Wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b>, gusting <b>${wS(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F${COND.wbgtF!=null?` · WBGT ~<b>${Math.round(COND.wbgtF)}°F</b> <span class="srcinline">est</span>`:""}.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
     precipLineHTML()+
-    (trend?`<div class="line">${trend}</div>`:"");
+    (trend?`<div class="line">${trend}</div>`:"")+
+    (!COND.isDay?(so=>so?`<div class="line">🌅 <b>Sunrise ${fmtTime(so.sr)}</b> — wind then predicted ~<b>${wS(so.w)} ${WUL} ${compass(so.dir)}</b>, gusting <b>${wS(so.g)}</b> — ${so.word}.</div>`:"")(sunriseOutlook(spot)):"");
 }
 function renderCrew(a){
   const items=crewItems(COND), lab={good:"OK",fair:"Caution",poor:"No-go",storm:"Stop"};
