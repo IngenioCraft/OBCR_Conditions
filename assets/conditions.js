@@ -414,11 +414,15 @@ function deriveNow(data,spot){
     if(wl.dir!=null)cond.windDir=wl.dir;
     cond.windSource="live"; cond.windStations=wl.stations||[]; cond.windAgeMin=wl.ageMin;
   }
-  // directional shelter (tucked-in harbors): trim MODEL wind blowing off the land, keep it when
-  // it's blowing down the open water. Conservative — gusts trimmed only half as much, floored at spot.shelter.min.
-  if(spot.shelter&&cond.windSource==="model"&&cond.windMph!=null&&cond.windDir!=null){
-    const f=shelterFactor(cond.windDir,spot.shelter.open,spot.shelter.min);
-    if(f<0.995){ cond.windRaw=cond.windMph; cond.gustRaw=cond.gustMph;
+  // directional adjustment of MODEL wind (used only when no fresh live reading):
+  //  - spot.windFactors: 16 per-sector factors (N first, 22.5° steps) CALIBRATED from logged
+  //    live-vs-model data (alerts/wind-calibrate.mjs). Can amplify (>1) as well as trim.
+  //  - spot.shelter {open,min}: the older cosine fallback — trim wind off the land, keep the open-fetch.
+  // Gusts move only half as far as wind, in either direction.
+  if(cond.windSource==="model"&&cond.windMph!=null&&cond.windDir!=null&&(spot.windFactors||spot.shelter)){
+    const f=spot.windFactors?dirFactor(cond.windDir,spot.windFactors)
+                            :shelterFactor(cond.windDir,spot.shelter.open,spot.shelter.min);
+    if(Math.abs(f-1)>0.005){ cond.windRaw=cond.windMph; cond.gustRaw=cond.gustMph;
       cond.windMph=cond.windMph*f;
       if(cond.gustMph!=null)cond.gustMph=cond.gustMph*(1-(1-f)*0.5);
       cond.windSheltered=true; cond.windFactor=f; }
@@ -470,6 +474,11 @@ function precipNow(wx){
 }
 /* Shelter factor: 1.0 when wind blows FROM the open-water bearing (long fetch, keep the model),
    down to minF when it blows from the opposite side (off the land). Smooth cosine falloff. */
+/* Per-sector calibrated factor: F is 16 values (N first, 22.5° steps); interpolate between sector centers. */
+function dirFactor(dir,F){
+  const p=(((dir%360)+360)%360)/22.5, i=Math.floor(p)%16, t=p-Math.floor(p);
+  return F[i]*(1-t)+F[(i+1)%16]*t;
+}
 function shelterFactor(fromDir,openBearing,minF){
   minF=(minF==null)?0.6:minF; if(openBearing==null)return 1;
   let diff=Math.abs(fromDir-openBearing); if(diff>180)diff=360-diff;
@@ -702,7 +711,8 @@ function sunriseOutlook(spot){
   let w=h.wind_speed_10m[idx], g=h.wind_gusts_10m[idx];
   const dir=h.wind_direction_10m?h.wind_direction_10m[idx]:null, code=h.weather_code?h.weather_code[idx]:0;
   const airAt=h.temperature_2m?h.temperature_2m[idx]:null;
-  if(spot&&spot.shelter&&dir!=null){const f=shelterFactor(dir,spot.shelter.open,spot.shelter.min);
+  if(spot&&dir!=null&&(spot.windFactors||spot.shelter)){
+    const f=spot.windFactors?dirFactor(dir,spot.windFactors):shelterFactor(dir,spot.shelter.open,spot.shelter.min);
     w=w*f; if(g!=null)g=g*(1-(1-f)*0.5);}
   const cw=coldWater(COND?COND.waterF:null,airAt);
   let word;

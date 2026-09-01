@@ -40,6 +40,12 @@ window.SPOT_CONFIG = {
       // that direction keeps the full model value; wind off the land is trimmed toward `min` (never below).
       // TUNE from experience: set `open` to the wind that most chops up the bay; raise `min` if it feels too calm.
       shelter:{ open:340, min:0.6 },
+      // CALIBRATED per-sector factors (model wind × factor when the live station is down),
+      // learned from ~1,500 logged live-vs-model samples (alerts/wind-calibrate.mjs, Sep 2026).
+      // Northerly wind (open fetch from the Sound) runs STRONGER than the model; E–SE is heavily
+      // sheltered. Takes precedence over `shelter` above. Re-run the calibrator seasonally.
+      //               N  NNE   NE  ENE    E  ESE   SE  SSE    S  SSW   SW  WSW    W  WNW   NW  NNW
+      windFactors:[1.41,1.13,0.91,0.74,0.49,0.43,0.50,0.56,0.64,0.70,0.66,0.64,0.71,0.75,1.17,1.58],
       tideStation:"8516201", waterTempStation:"8516945",
       // LIVE WIND: Sagamore Yacht Club's public WeatherLink station (~0.8 mi, right in the harbor),
       // proxied through the Worker (converts knots→mph, checks freshness). When it's reporting, the page
@@ -71,6 +77,6 @@ window.SPOT_CONFIG = {
   ]
 };
 </script>
-<script src="assets/conditions.js?v=20260830"></script>
+<script src="assets/conditions.js?v=20260901"></script>
 </body>
 </html>
