@@ -44,6 +44,14 @@ window.SPOT_CONFIG = {
       // learned from ~1,500 logged live-vs-model samples (alerts/wind-calibrate.mjs, Sep 2026).
       // Northerly wind (open fetch from the Sound) runs STRONGER than the model; E–SE is heavily
       // sheltered. Takes precedence over `shelter` above. Re-run the calibrator seasonally.
+      //
+      // ⚠ CAVEAT — these describe SAGAMORE, not the launch. The calibrator pairs live wind from the
+      // Sagamore station against the model at Beekman's coords, so each factor is Sagamore's exposure.
+      // Sagamore sits ~1 km EAST of Beekman on the south side of the harbour, so on a WESTERLY it has
+      // ~1 km more over-water fetch than the launch does: Beekman Beach and West Shore Road sit in the
+      // lee of the land to their west and run genuinely calmer than these W/WSW/WNW factors imply.
+      // Correcting this needs ground truth AT the launch (handheld anemometer or logged crew reports)
+      // — there is no sensor at Beekman, so it cannot be derived from the existing log.
       //               N  NNE   NE  ENE    E  ESE   SE  SSE    S  SSW   SW  WSW    W  WNW   NW  NNW
       windFactors:[1.41,1.13,0.91,0.74,0.49,0.43,0.50,0.56,0.64,0.70,0.66,0.64,0.71,0.75,1.17,1.58],
       tideStation:"8516201", waterTempStation:"8516945",

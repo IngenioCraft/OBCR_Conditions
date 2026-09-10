@@ -49,7 +49,9 @@ export default {
 };
 
 /* ---------------- WIND CALIBRATION LOG ---------------- */
-// The spot the shelter model is tuned for (Beekman Beach) and its live station's embed token.
+// Model side is sampled at Beekman Beach; the live side is the Sagamore station ~1 km east.
+// These are NOT the same exposure — the resulting ratios describe Sagamore, not the launch.
+// See the CAVEAT on `windFactors` in oyster-bay.html before trusting them as a Beekman model.
 const CAL_SPOT = { lat: 40.8767, lon: -73.5413, weatherlink: "e9aef99860fc4aecb73f08d0d9cb3e37" };
 
 async function logWindSample(env) {
