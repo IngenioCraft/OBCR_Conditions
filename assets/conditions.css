@@ -254,3 +254,6 @@ body.eink .card .val{font-size:1.9rem} body.eink h1{font-size:1.6rem} body.eink 
 body.eink .legend i{filter:grayscale(1)}
 body.eink iframe{display:none}
 body.eink .secnav{display:none}
+/* Watch line in the crew summary — a heat/fog/cold caution is the reason for the banner colour,
+   so it gets its own row instead of trailing the wind sentence. */
+.summary .watchline{margin-top:6px;font-weight:600}

@@ -762,7 +762,18 @@ function renderCrewSummary(s,spot){
          : k==="heat" ? (COND.wbgtF>=T.wbgtNoGo?"Off the water — heat no-go (WBGT ≥ 90°F)":"High risk — heat limits (WBGT)")
          : k==="visibility" ? "Not advisable — fog / low visibility"
          : "Not advisable — too rough";
-  } else if(lv==="fair") head=items.some(i=>i.key==="coldwater"&&i.lv==="fair")?"Go with restrictions — 4-oar rule":"Row with caution";
+  } else if(lv==="fair"){
+    // Name the amber driver too — a lone WBGT/fog/daylight caution used to read as a wind warning.
+    const prioF=["coldwater","heat","visibility","daylight","wind","water","gusts"];
+    const drvF=prioF.map(k=>items.find(i=>i.key===k&&i.lv==="fair")).find(Boolean);
+    const kf=drvF?drvF.key:"";
+    head = kf==="coldwater" ? "Go with restrictions — 4-oar rule"
+         : kf==="heat" ? "Row with caution — heat (WBGT ~"+Math.round(COND.wbgtF)+"°F)"
+         : kf==="visibility" ? "Row with caution — fog risk"
+         : kf==="daylight" ? "Row with caution — little light left"
+         : (kf==="wind"||kf==="water"||kf==="gusts") ? "Row with caution — wind & chop"
+         : "Row with caution";
+  }
   else head="Good to row";
   s.className="summary lv-"+lv;
   const dir=compass(COND.windDir), flags=[];
@@ -774,7 +785,8 @@ function renderCrewSummary(s,spot){
   const trend=windTrend();
   s.innerHTML=`<div class="pill">OBCR crew conditions</div>`+
     `<div class="headline">${head}</div>`+
-    `<div class="line">Wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b>, gusting <b>${wS(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F${COND.wbgtF!=null?` · WBGT ~<b>${Math.round(COND.wbgtF)}°F</b> <span class="srcinline">est</span>`:""}.${flags.length?` <b>Watch:</b> ${flags.join(", ")}.`:""}</div>`+
+    `<div class="line">Wind <b>${wS(COND.windMph)} ${WUL} ${dir}</b>, gusting <b>${wS(COND.gustMph)}</b> <span class="srcinline">· ${COND.windLabel}</span> · water <b>${COND.waterF!=null?round(COND.waterF)+"°F":"n/a"}</b> · air ${round(COND.airF)}°F${COND.wbgtF!=null?` · WBGT ~<b>${Math.round(COND.wbgtF)}°F</b> <span class="srcinline">est</span>`:""}.</div>`+
+    (flags.length?`<div class="line watchline"><b>⚠ Watch:</b> ${flags.join(", ")}.</div>`:"")+
     precipLineHTML()+
     (trend?`<div class="line">${trend}</div>`:"")+
     (!COND.isDay?(so=>so?`<div class="line">🌅 <b>Sunrise ${fmtTime(so.sr)}</b> — wind then predicted ~<b>${wS(so.w)} ${WUL} ${compass(so.dir)}</b>, gusting <b>${wS(so.g)}</b> — ${so.word}.</div>`:"")(sunriseOutlook(spot)):"");
