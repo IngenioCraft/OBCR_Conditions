@@ -1,0 +1,6 @@
+# Subscriber list contains real names/emails — keep it out of a public repo.
+# (If the alert workflow needs it in the repo, use a private repo or encrypt it first.)
+alerts/subscribers.json
+
+# Claude Code session directory — local tooling state, never part of the site.
+.claude/

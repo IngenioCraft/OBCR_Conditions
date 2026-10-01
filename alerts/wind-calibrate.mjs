@@ -62,6 +62,29 @@ if (best) {
   console.log(`Mean error (sheltered model − live):  current ${bias(340, 0.6).toFixed(1)} mph · best-fit ${bias(best.open, best.min).toFixed(1)} mph`);
 }
 
+/* ---- 3. per-sector factor table (for spot.windFactors — handles amplification the cosine can't) ---- */
+{
+  const meds = bins.map(b => b.length ? median(b.map(s => s.lw / s.mw)) : null);
+  const ns = bins.map(b => b.length);
+  // fill any empty sector from its nearest sampled neighbors (circular)
+  for (let i = 0; i < 16; i++) if (meds[i] == null) {
+    for (let d = 1; d < 8; d++) {
+      const a = meds[(i - d + 16) % 16], b = meds[(i + d) % 16];
+      if (a != null || b != null) { meds[i] = a != null && b != null ? (a + b) / 2 : (a != null ? a : b); break; }
+    }
+  }
+  // count-weighted smoothing with neighbors, so thin sectors lean on their neighbors
+  const F = meds.map((m, i) => {
+    const l = (i + 15) % 16, r = (i + 1) % 16;
+    const wl = 0.25 * Math.min(ns[l], 60), wc = 0.5 * Math.min(ns[i], 60) + 1e-6, wr = 0.25 * Math.min(ns[r], 60);
+    const v = (m * wc + meds[l] * wl + meds[r] * wr) / (wc + wl + wr);
+    return Math.min(2, Math.max(0.35, Math.round(v * 100) / 100));   // clamp to sanity
+  });
+  console.log("\nPer-sector factor table (smoothed medians — paste into the spot config):");
+  console.log("  //           " + SECT.map(s => s.padStart(5)).join(""));
+  console.log("  windFactors:[" + F.join(",") + "],");
+}
+
 /* ---- gusts: a single overall scale check ---- */
 const gs = j.samples.filter(s => s.lg != null && s.mg != null && s.mg >= 6);
 if (gs.length) console.log(`\nGusts: median live/model ratio ${median(gs.map(s => s.lg / s.mg)).toFixed(2)} over ${gs.length} samples (page currently trims gusts half as much as wind).`);
