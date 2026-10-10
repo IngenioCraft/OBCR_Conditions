@@ -151,18 +151,24 @@ async function main(){
     const ch = sub.channel || "sms";
     const parts = formatAlert(sub.label, rb, ch);
     if(DRY){
+      // Dry runs must never advance cooldown — a test run during a real rainbow window would
+      // otherwise silently eat that person's alert for the next COOLDOWN_HOURS.
       console.log(`  [DRY] would ${ch} ${contactOf(sub)}: ${parts.body.replace(/\n+/g," ")}`);
-    } else {
-      try {
-        const res = await dispatch(sub, parts, senderCfg);
-        console.log(`  sent ${ch} to ${contactOf(sub)} (${res})`);
-      } catch(e){ console.error(`  FAILED ${ch} ${contactOf(sub)}: ${e.message}`); continue; }
+      continue;
     }
+    try {
+      const res = await dispatch(sub, parts, senderCfg);
+      console.log(`  sent ${ch} to ${contactOf(sub)} (${res})`);
+    } catch(e){ console.error(`  FAILED ${ch} ${contactOf(sub)}: ${e.message}`); continue; }
     state.lastAlert[sub.id] = now.toISOString();
   }
 
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
-  console.log("  state saved.");
+  if(DRY){
+    console.log("  dry run — state not modified.");
+  } else {
+    await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+    console.log("  state saved.");
+  }
 }
 
 // run only when executed directly (not when imported by tests)

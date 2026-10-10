@@ -81,11 +81,30 @@ jobs:
         run: node rainbow-watch.mjs
 
       - name: Persist alert state
+        # A signup (via the Worker's own GitHub API commit) can land between our checkout and this
+        # push — a bare `git push` would then be rejected, silently losing the just-sent cooldown
+        # record and causing a repeat alert next run. Re-fetch the latest tree and retry with our
+        # computed state re-applied on top, rather than fail on the first race.
         run: |
-          if ! git diff --quiet -- alerts/state.json; then
-            git config user.name "rainbow-bot"
-            git config user.email "rainbow-bot@users.noreply.github.com"
+          cp alerts/state.json /tmp/new-state.json
+          git config user.name "rainbow-bot"
+          git config user.email "rainbow-bot@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git fetch origin "$GITHUB_REF_NAME"
+            git reset --hard "origin/$GITHUB_REF_NAME"
+            cp /tmp/new-state.json alerts/state.json
+            if git diff --quiet -- alerts/state.json; then
+              echo "state already up to date — nothing to persist"
+              exit 0
+            fi
             git add alerts/state.json
             git commit -m "update alert state [skip ci]"
-            git push
-          fi
+            if git push origin "HEAD:$GITHUB_REF_NAME"; then
+              echo "state persisted (attempt $i)"
+              exit 0
+            fi
+            echo "push rejected (attempt $i of 5) — retrying after a concurrent write"
+            sleep $((i * 3))
+          done
+          echo "::error::failed to persist alert state after 5 attempts — a notification just sent may repeat next run"
+          exit 1

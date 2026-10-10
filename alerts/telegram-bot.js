@@ -30,8 +30,10 @@ const SPOTS = [
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    // require the secret path so randoms can't drive the bot
-    if (url.pathname.replace(/^\//, "") !== (env.WEBHOOK_SECRET || "")) {
+    // require the secret path so randoms can't drive the bot. Fail CLOSED: if WEBHOOK_SECRET isn't
+    // configured, env.WEBHOOK_SECRET is undefined and nothing should ever match it — a bare request
+    // to the Worker's root must never be treated as authenticated.
+    if (!env.WEBHOOK_SECRET || url.pathname.replace(/^\//, "") !== env.WEBHOOK_SECRET) {
       return new Response("not found", { status: 404 });
     }
     if (request.method !== "POST") return new Response("ok");
@@ -46,8 +48,11 @@ export default {
         await onCallback(env, update.callback_query);
       }
     } catch (e) {
-      // never 500 back to Telegram — it would just retry the same update
       console.log("bot error:", e && e.message);
+      // A store write conflict (e.g. the watcher or another signup committed in between) is
+      // transient — tell Telegram to retry so the user's /start or /stop isn't silently dropped.
+      // Anything else (a bug our own retry can't fix) still acks, so Telegram doesn't loop forever.
+      if (e && e.retryable) return new Response("conflict", { status: 503 });
     }
     return new Response("ok");
   },
@@ -122,18 +127,21 @@ async function readStore(env) {
   const api = ghApi(env);
   const r = await fetch(api, { headers: ghHeaders(env) });
   if (r.status === 404) return { list: [], sha: undefined };
-  if (!r.ok) throw new Error("store read " + r.status);
+  if (!r.ok) { const e = new Error("store read " + r.status); e.retryable = r.status === 409 || r.status >= 500; throw e; }
   const meta = await r.json();
-  let list = [];
-  try { list = JSON.parse(b64decode(meta.content)); } catch { list = []; }
-  return { list: Array.isArray(list) ? list : [], sha: meta.sha };
+  // Fail CLOSED on a malformed store — see signup-worker.js for why. Resetting to [] here would let
+  // the next /start silently wipe every real subscriber via the following writeStore call.
+  let list;
+  try { list = JSON.parse(b64decode(meta.content)); } catch { throw new Error("store is corrupted (invalid JSON) — refusing to proceed"); }
+  if (!Array.isArray(list)) throw new Error("store is corrupted (not a list) — refusing to proceed");
+  return { list, sha: meta.sha };
 }
 async function writeStore(env, list, sha, message) {
   const r = await fetch(ghApi(env), {
     method: "PUT", headers: { ...ghHeaders(env), "Content-Type": "application/json" },
     body: JSON.stringify({ message, content: b64encode(JSON.stringify(list, null, 2) + "\n"), sha }),
   });
-  if (!r.ok) throw new Error("store write " + r.status);
+  if (!r.ok) { const e = new Error("store write " + r.status); e.retryable = r.status === 409 || r.status >= 500; throw e; }
 }
 async function addSubscriber(env, chatId, spot) {
   const { list, sha } = await readStore(env);

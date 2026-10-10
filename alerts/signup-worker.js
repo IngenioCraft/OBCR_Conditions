@@ -22,6 +22,7 @@
    ============================================================ */
 
 const MAX_TARGETS = 6;
+const MAX_SUBS_PER_CONTACT = 12; // across all spots/time — bounds unbounded growth from one contact
 const CHANNELS = ["email", "sms", "push", "telegram"];
 
 export default {
@@ -56,7 +57,7 @@ export default {
     } else if (channel === "push") {
       const sub = body.push;
       if (!sub || typeof sub.endpoint !== "string" || !sub.keys) return json({ error: "Invalid push subscription" }, 400, cors);
-      contact = sub.endpoint; contactKey = sub.endpoint.slice(0, 120);
+      contact = sub.endpoint; contactKey = sub.endpoint; // full endpoint — never truncate the dedupe key
       contactFields = { push: { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } } };
     } else { // telegram
       contact = String(body.telegram || "").replace(/\D/g, "");
@@ -88,20 +89,37 @@ export default {
     if (getRes.status === 200) {
       const meta = await getRes.json();
       sha = meta.sha;
-      try { list = JSON.parse(b64decode(meta.content)); } catch { list = []; }
-      if (!Array.isArray(list)) list = [];
+      // Fail CLOSED on a malformed store: a parse error or non-array content means something is
+      // wrong with the file, not that it's empty — proceeding would overwrite every real subscriber
+      // with just this one signup. Refuse instead, so the store is never silently destroyed.
+      let parsed;
+      try { parsed = JSON.parse(b64decode(meta.content)); }
+      catch { return json({ error: "Store is corrupted (invalid JSON) — refusing to write" }, 502, cors); }
+      if (!Array.isArray(parsed)) return json({ error: "Store is corrupted (not a list) — refusing to write" }, 502, cors);
+      list = parsed;
     } else if (getRes.status !== 404) {
       return json({ error: "Store read failed", status: getRes.status }, 502, cors);
     }
 
-    // --- append (dedupe by channel + contact + label) ---
-    const existing = new Set(list.map((s) => `${s.channel || "sms"}|${contactKeyOf(s)}|${s.label}`));
-    let added = 0;
+    // --- append (dedupe by channel + contact + label; reactivate a matching inactive row
+    //     instead of silently no-opping, so someone who unsubscribed can resubscribe) ---
+    const existingActive = new Map(
+      list.filter((s) => s.active !== false).map((s, i) => [`${s.channel || "sms"}|${contactKeyOf(s)}|${s.label}`, s])
+    );
+    const contactTotal = list.filter((s) => s.active !== false && (s.channel || "sms") === channel && contactKeyOf(s) === contactKey).length;
+    let added = 0, reactivated = 0;
     const addedLabels = [];
+    let room = Math.max(0, MAX_SUBS_PER_CONTACT - contactTotal);
     for (const t of clean) {
       const key = `${channel}|${contactKey}|${t.label}`;
-      if (existing.has(key)) continue;
-      existing.add(key);
+      if (existingActive.has(key)) continue;
+      const stale = list.find((s) => s.active === false && (s.channel || "sms") === channel && contactKeyOf(s) === contactKey && s.label === t.label);
+      if (stale) {
+        stale.active = true; stale.includeMaybe = includeMaybe; stale.added = new Date().toISOString();
+        reactivated++; addedLabels.push(t.label);
+        continue;
+      }
+      if (room <= 0) continue; // quietly stop adding new rows once this contact hits the cap
       list.push({
         id: slug(channel, contactKey, t.label),
         channel, ...contactFields,
@@ -109,11 +127,14 @@ export default {
         includeMaybe, active: true,
         added: new Date().toISOString(),
       });
-      added++;
+      added++; room--;
       addedLabels.push(t.label);
     }
 
-    if (added === 0) return json({ ok: true, added: 0, note: "Already subscribed to those spots." }, 200, cors);
+    if (added === 0 && reactivated === 0) {
+      const capped = contactTotal >= MAX_SUBS_PER_CONTACT;
+      return json({ ok: true, added: 0, note: capped ? `You're at the ${MAX_SUBS_PER_CONTACT}-spot limit per contact.` : "Already subscribed to those spots." }, 200, cors);
+    }
 
     // --- write back ---
     const put = await fetch(api, {
@@ -143,7 +164,7 @@ export default {
       }
     } catch (e) { welcome = "failed: " + e.message; }
 
-    return json({ ok: true, added, channel, welcome }, 200, cors);
+    return json({ ok: true, added, reactivated, channel, welcome }, 200, cors);
   },
 };
 
@@ -179,7 +200,7 @@ function contactKeyOf(s) {
   if (ch === "email") return String(s.email || "").toLowerCase();
   if (ch === "sms") return s.phone || "";
   if (ch === "telegram") return String(s.telegram || "");
-  if (ch === "push") return (s.push && s.push.endpoint) ? s.push.endpoint.slice(0, 120) : "";
+  if (ch === "push") return (s.push && s.push.endpoint) ? s.push.endpoint : ""; // full endpoint — never truncate
   return "";
 }
 function normPhone(v) {
@@ -190,8 +211,18 @@ function normPhone(v) {
   return null; // US numbers only
 }
 function slug(channel, contactKey, label) {
-  const tail = String(contactKey).replace(/[^a-z0-9]/gi, "").slice(-6) || "x";
+  // A short raw-character suffix (e.g. last 6 chars) collides easily — two different emails, or two
+  // push endpoints sharing a common prefix, can land on the same tail. Hash the FULL contactKey
+  // instead; ids are opaque anyway (they're only looked up by exact value, never typed by a person).
+  const tail = fnv1a(String(contactKey));
   return (label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + channel + "-" + tail);
+}
+// Fast, dependency-free, non-cryptographic hash — fine here since it's only for id-collision
+// avoidance, not security. Returns 8 hex chars (32 bits).
+function fnv1a(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16).padStart(8, "0");
 }
 const round4 = (n) => Math.round(n * 1e4) / 1e4;
 function b64encode(str) {
