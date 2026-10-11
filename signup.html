@@ -329,11 +329,23 @@ async function submitForm(){
   btn.disabled=true; btn.textContent="Signing you up…";
   try{
     const r=await fetch(SIGNUP_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const how = channel==="email" ? "email you" : channel==="sms" ? "text you" : "send you a notification";
+    const data=await r.json().catch(()=>({}));
+    if(r.status===429){
+      res.className="result warn show"; btn.disabled=false; btn.textContent="Notify me when there's a rainbow 🌈";
+      res.textContent=data.error||"Too many attempts — please try again in a few minutes.";
+      return;
+    }
+    if(!r.ok) throw new Error(data.error||("HTTP "+r.status));
     res.className="result ok show";
-    res.innerHTML=`🌈 You're in! We'll ${how} when a rainbow is `+(payload.includeMaybe?"likely or possible":"likely")+` at ${targets.map(t=>t.label).join(", ")}.`;
-    btn.textContent="Signed up ✓";
+    if(data.pending){
+      // email channel: nothing is active yet until they click the confirm link we just sent
+      res.innerHTML=`📬 Almost there — check <b>${payload.email}</b> for a confirm link (expires in an hour) to start getting Rainbow Alerts for ${targets.map(t=>t.label).join(", ")}.`;
+      btn.textContent="Check your email ✓";
+    } else {
+      const how = channel==="sms" ? "text you" : "send you a notification";
+      res.innerHTML=`🌈 You're in! We'll ${how} when a rainbow is `+(payload.includeMaybe?"likely or possible":"likely")+` at ${targets.map(t=>t.label).join(", ")}.`;
+      btn.textContent="Signed up ✓";
+    }
   }catch(e){
     res.className="result warn show"; btn.disabled=false; btn.textContent="Notify me when there's a rainbow 🌈";
     res.textContent="Hmm, that didn't go through. Please try again in a moment.";

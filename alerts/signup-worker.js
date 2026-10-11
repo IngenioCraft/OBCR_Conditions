@@ -14,6 +14,24 @@
      TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / (TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID)  → SMS welcome
      TELEGRAM_BOT_TOKEN                                                                      → Telegram welcome
 
+   RATE LIMITING + EMAIL OWNERSHIP VERIFICATION (recommended — both need one KV binding):
+     1. Storage & Databases → KV → create a namespace (e.g. "signup-kv").
+     2. Worker → Settings → Bindings → add KV binding named  SIGNUP_KV  → that namespace.
+     Without this binding, rate limiting and the email-confirm flow are both skipped (requests
+     pass straight through — same as before this feature existed), so it's safe to deploy first
+     and provision the KV namespace separately.
+
+     Email ownership verification (magic link): a plain signup POST for channel:"email" no longer
+     writes to the subscriber store directly — it stores a short-lived pending record in SIGNUP_KV
+     and emails a confirm link. Clicking it hits this same Worker at GET /confirm?token=... which
+     does the actual write. SMS/push/Telegram are unchanged (Telegram is already self-verifying —
+     you have to message the bot from the account itself; SMS/push ownership verification would need
+     its own OTP/subscription-proof flow, not implemented here).
+       MAIL_FROM        (var)     "Rainbow Alerts <alerts@yourdomain>" — must be a domain you've
+                                   verified with your email provider
+       RESEND_API_KEY   (secret)  a free API key from resend.com (or swap sendConfirmEmail() below
+                                   for any other HTTP email API — it's the one place that's called)
+
    The form posts JSON per channel:
      { channel:"email",    email:"a@b.com",     includeMaybe, targets:[{label,lat,lon}] }
      { channel:"sms",      phone:"+1...",       includeMaybe, targets:[...] }
@@ -24,6 +42,9 @@
 const MAX_TARGETS = 6;
 const MAX_SUBS_PER_CONTACT = 12; // across all spots/time — bounds unbounded growth from one contact
 const CHANNELS = ["email", "sms", "push", "telegram"];
+const RATE_LIMIT_WINDOW_SEC = 300;  // 5 minutes
+const RATE_LIMIT_MAX = 5;           // signup POSTs per IP per window
+const PENDING_TTL_SEC = 3600;       // how long an email confirm link stays valid
 
 export default {
   async fetch(request, env) {
@@ -35,9 +56,18 @@ export default {
       "Access-Control-Max-Age": "86400",
     };
 
+    const url = new URL(request.url);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    if (url.pathname === "/confirm" && request.method === "GET") return handleConfirm(url, env);
     if (request.method === "GET") return json({ ok: true, service: "rainbow-signup" }, 200, cors);
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, cors);
+
+    // --- flood-level rate limit (per client IP). Skipped entirely if SIGNUP_KV isn't bound yet. ---
+    if (env.SIGNUP_KV) {
+      const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || "unknown";
+      const limited = await rateLimited(env, "rl:" + ip);
+      if (limited) return json({ error: "Too many signup attempts — please try again in a few minutes." }, 429, cors);
+    }
 
     let body;
     try { body = await request.json(); }
@@ -76,97 +106,178 @@ export default {
     }
     if (!clean.length) return json({ error: "No valid spots" }, 400, cors);
 
-    // --- read current subscribers.json from GitHub ---
-    const api = `https://api.github.com/repos/${env.GH_OWNER}/${env.GH_REPO}/contents/${env.GH_PATH}`;
-    const ghHeaders = {
-      "Authorization": `Bearer ${env.GH_TOKEN}`,
-      "Accept": "application/vnd.github+json",
-      "User-Agent": "rainbow-signup-worker",
-    };
-
-    let list = [], sha = undefined;
-    const getRes = await fetch(api, { headers: ghHeaders });
-    if (getRes.status === 200) {
-      const meta = await getRes.json();
-      sha = meta.sha;
-      // Fail CLOSED on a malformed store: a parse error or non-array content means something is
-      // wrong with the file, not that it's empty — proceeding would overwrite every real subscriber
-      // with just this one signup. Refuse instead, so the store is never silently destroyed.
-      let parsed;
-      try { parsed = JSON.parse(b64decode(meta.content)); }
-      catch { return json({ error: "Store is corrupted (invalid JSON) — refusing to write" }, 502, cors); }
-      if (!Array.isArray(parsed)) return json({ error: "Store is corrupted (not a list) — refusing to write" }, 502, cors);
-      list = parsed;
-    } else if (getRes.status !== 404) {
-      return json({ error: "Store read failed", status: getRes.status }, 502, cors);
-    }
-
-    // --- append (dedupe by channel + contact + label; reactivate a matching inactive row
-    //     instead of silently no-opping, so someone who unsubscribed can resubscribe) ---
-    const existingActive = new Map(
-      list.filter((s) => s.active !== false).map((s, i) => [`${s.channel || "sms"}|${contactKeyOf(s)}|${s.label}`, s])
-    );
-    const contactTotal = list.filter((s) => s.active !== false && (s.channel || "sms") === channel && contactKeyOf(s) === contactKey).length;
-    let added = 0, reactivated = 0;
-    const addedLabels = [];
-    let room = Math.max(0, MAX_SUBS_PER_CONTACT - contactTotal);
-    for (const t of clean) {
-      const key = `${channel}|${contactKey}|${t.label}`;
-      if (existingActive.has(key)) continue;
-      const stale = list.find((s) => s.active === false && (s.channel || "sms") === channel && contactKeyOf(s) === contactKey && s.label === t.label);
-      if (stale) {
-        stale.active = true; stale.includeMaybe = includeMaybe; stale.added = new Date().toISOString();
-        reactivated++; addedLabels.push(t.label);
-        continue;
+    // --- email: verify ownership via a confirm link instead of writing immediately ---
+    if (channel === "email") {
+      if (!env.SIGNUP_KV) {
+        return json({ error: "Email signup needs the SIGNUP_KV binding — see the Worker's header comment." }, 502, cors);
       }
-      if (room <= 0) continue; // quietly stop adding new rows once this contact hits the cap
-      list.push({
-        id: slug(channel, contactKey, t.label),
-        channel, ...contactFields,
-        label: t.label, lat: t.lat, lon: t.lon,
-        includeMaybe, active: true,
-        added: new Date().toISOString(),
-      });
-      added++; room--;
-      addedLabels.push(t.label);
+      if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
+        return json({ error: "Email sending isn't configured yet (RESEND_API_KEY / MAIL_FROM) — see the Worker's header comment." }, 502, cors);
+      }
+      const token = crypto.randomUUID().replace(/-/g, "");
+      await env.SIGNUP_KV.put("pending:" + token, JSON.stringify({ channel, contactKey, contactFields, clean, includeMaybe, contact }), { expirationTtl: PENDING_TTL_SEC });
+      const confirmUrl = url.origin + "/confirm?token=" + token;
+      try {
+        await sendConfirmEmail(env, contact, confirmUrl, clean.map((t) => t.label).join(", "));
+      } catch (e) {
+        return json({ error: "Could not send confirmation email", detail: e.message }, 502, cors);
+      }
+      return json({ ok: true, pending: true, channel, note: "Check your email for a confirm link — it expires in an hour." }, 200, cors);
     }
 
-    if (added === 0 && reactivated === 0) {
-      const capped = contactTotal >= MAX_SUBS_PER_CONTACT;
-      return json({ ok: true, added: 0, note: capped ? `You're at the ${MAX_SUBS_PER_CONTACT}-spot limit per contact.` : "Already subscribed to those spots." }, 200, cors);
-    }
-
-    // --- write back ---
-    const put = await fetch(api, {
-      method: "PUT",
-      headers: { ...ghHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: `signup: ${channel} (+${added} spot${added > 1 ? "s" : ""})`,
-        content: b64encode(JSON.stringify(list, null, 2) + "\n"),
-        sha,
-      }),
-    });
-    if (!put.ok) {
-      const detail = await put.text().catch(() => "");
-      return json({ error: "Store write failed", status: put.status, detail: detail.slice(0, 200) }, 502, cors);
-    }
-
-    // --- welcome (only for channels the Worker can reach directly: SMS, Telegram) ---
-    let welcome = "skipped";
-    const spots = addedLabels.join(", ");
+    // --- sms / push / telegram: unchanged, immediate write (no ownership-verification flow yet) ---
     try {
-      if (channel === "sms" && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && (env.TWILIO_FROM || env.TWILIO_MESSAGING_SERVICE_SID)) {
-        await twilioSend(env, contact, `\u{1F308} You're subscribed to Rainbow Alerts for ${spots}. We'll text you when a rainbow is likely. Reply STOP to opt out.`);
-        welcome = "sent";
-      } else if (channel === "telegram" && env.TELEGRAM_BOT_TOKEN) {
-        await telegramSend(env, contact, `\u{1F308} You're subscribed to Rainbow Alerts for ${spots}. Send /stop anytime to turn these off.`);
-        welcome = "sent";
+      const result = await commitSignup(env, channel, contactKey, contactFields, clean, includeMaybe);
+      if (result.added === 0 && result.reactivated === 0) {
+        const capped = result.contactTotal >= MAX_SUBS_PER_CONTACT;
+        return json({ ok: true, added: 0, note: capped ? `You're at the ${MAX_SUBS_PER_CONTACT}-spot limit per contact.` : "Already subscribed to those spots." }, 200, cors);
       }
-    } catch (e) { welcome = "failed: " + e.message; }
-
-    return json({ ok: true, added, reactivated, channel, welcome }, 200, cors);
+      let welcome = "skipped";
+      const spots = result.addedLabels.join(", ");
+      try {
+        if (channel === "sms" && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && (env.TWILIO_FROM || env.TWILIO_MESSAGING_SERVICE_SID)) {
+          await twilioSend(env, contact, `\u{1F308} You're subscribed to Rainbow Alerts for ${spots}. We'll text you when a rainbow is likely. Reply STOP to opt out.`);
+          welcome = "sent";
+        } else if (channel === "telegram" && env.TELEGRAM_BOT_TOKEN) {
+          await telegramSend(env, contact, `\u{1F308} You're subscribed to Rainbow Alerts for ${spots}. Send /stop anytime to turn these off.`);
+          welcome = "sent";
+        }
+      } catch (e) { welcome = "failed: " + e.message; }
+      return json({ ok: true, added: result.added, reactivated: result.reactivated, channel, welcome }, 200, cors);
+    } catch (e) {
+      return json({ error: e.message }, 502, cors);
+    }
   },
 };
+
+/* ---------- GET /confirm?token=... — the magic-link landing page ---------- */
+async function handleConfirm(url, env) {
+  const html = (title, body) => new Response(
+    `<!doctype html><meta charset="utf-8"><title>${title}</title>` +
+    `<body style="font:16px -apple-system,sans-serif;max-width:480px;margin:60px auto;padding:0 20px;text-align:center;color:#1c2b33">` +
+    `<h1 style="color:#0b4f6c">${title}</h1><p>${body}</p></body>`,
+    { headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
+  if (!env.SIGNUP_KV) return html("Not available", "Confirmation isn't configured on this Worker yet.");
+  const token = url.searchParams.get("token") || "";
+  const raw = token && await env.SIGNUP_KV.get("pending:" + token);
+  if (!raw) return html("Link expired", "This confirm link is invalid or has expired (links last 1 hour) — please sign up again.");
+  let pending;
+  try { pending = JSON.parse(raw); } catch { return html("Something went wrong", "Please sign up again."); }
+  await env.SIGNUP_KV.delete("pending:" + token); // one-time use
+  try {
+    const result = await commitSignup(env, pending.channel, pending.contactKey, pending.contactFields, pending.clean, pending.includeMaybe);
+    const spots = (result.addedLabels && result.addedLabels.length ? result.addedLabels : pending.clean.map((t) => t.label)).join(", ");
+    return html("🌈 You're confirmed!", `You'll get Rainbow Alerts for <b>${spots}</b>.`);
+  } catch (e) {
+    return html("Something went wrong", "Please try signing up again. (" + e.message + ")");
+  }
+}
+
+/* ---------- shared store-append logic (email-confirm path and immediate channels both use this) ---------- */
+async function commitSignup(env, channel, contactKey, contactFields, clean, includeMaybe) {
+  const api = `https://api.github.com/repos/${env.GH_OWNER}/${env.GH_REPO}/contents/${env.GH_PATH}`;
+  const ghHeaders = {
+    "Authorization": `Bearer ${env.GH_TOKEN}`,
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "rainbow-signup-worker",
+  };
+
+  let list = [], sha = undefined;
+  const getRes = await fetch(api, { headers: ghHeaders });
+  if (getRes.status === 200) {
+    const meta = await getRes.json();
+    sha = meta.sha;
+    // Fail CLOSED on a malformed store: a parse error or non-array content means something is
+    // wrong with the file, not that it's empty — proceeding would overwrite every real subscriber
+    // with just this one signup. Refuse instead, so the store is never silently destroyed.
+    let parsed;
+    try { parsed = JSON.parse(b64decode(meta.content)); }
+    catch { throw new Error("Store is corrupted (invalid JSON) — refusing to write"); }
+    if (!Array.isArray(parsed)) throw new Error("Store is corrupted (not a list) — refusing to write");
+    list = parsed;
+  } else if (getRes.status !== 404) {
+    throw new Error("Store read failed: " + getRes.status);
+  }
+
+  // --- append (dedupe by channel + contact + label; reactivate a matching inactive row
+  //     instead of silently no-opping, so someone who unsubscribed can resubscribe) ---
+  const existingActive = new Map(
+    list.filter((s) => s.active !== false).map((s) => [`${s.channel || "sms"}|${contactKeyOf(s)}|${s.label}`, s])
+  );
+  const contactTotal = list.filter((s) => s.active !== false && (s.channel || "sms") === channel && contactKeyOf(s) === contactKey).length;
+  let added = 0, reactivated = 0;
+  const addedLabels = [];
+  let room = Math.max(0, MAX_SUBS_PER_CONTACT - contactTotal);
+  for (const t of clean) {
+    const key = `${channel}|${contactKey}|${t.label}`;
+    if (existingActive.has(key)) continue;
+    const stale = list.find((s) => s.active === false && (s.channel || "sms") === channel && contactKeyOf(s) === contactKey && s.label === t.label);
+    if (stale) {
+      stale.active = true; stale.includeMaybe = includeMaybe; stale.added = new Date().toISOString();
+      reactivated++; addedLabels.push(t.label);
+      continue;
+    }
+    if (room <= 0) continue; // quietly stop adding new rows once this contact hits the cap
+    list.push({
+      id: slug(channel, contactKey, t.label),
+      channel, ...contactFields,
+      label: t.label, lat: t.lat, lon: t.lon,
+      includeMaybe, active: true,
+      added: new Date().toISOString(),
+    });
+    added++; room--;
+    addedLabels.push(t.label);
+  }
+
+  if (added === 0 && reactivated === 0) return { added, reactivated, addedLabels, contactTotal };
+
+  const put = await fetch(api, {
+    method: "PUT",
+    headers: { ...ghHeaders, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: `signup: ${channel} (+${added} spot${added > 1 ? "s" : ""})`,
+      content: b64encode(JSON.stringify(list, null, 2) + "\n"),
+      sha,
+    }),
+  });
+  if (!put.ok) {
+    const detail = await put.text().catch(() => "");
+    throw new Error(`Store write failed: ${put.status} ${detail.slice(0, 200)}`);
+  }
+  return { added, reactivated, addedLabels, contactTotal };
+}
+
+/* ---------- flood rate limit (Workers KV, fixed window) ----------
+   Not atomic under true concurrency (KV is read-modify-write, not increment), which is fine here —
+   this is an abuse deterrent, not a security boundary. A couple of requests slipping through right
+   at the edge of the window doesn't matter; a sustained flood still gets capped within one window. */
+async function rateLimited(env, key) {
+  const windowKey = key + ":" + Math.floor(Date.now() / 1000 / RATE_LIMIT_WINDOW_SEC);
+  const current = +(await env.SIGNUP_KV.get(windowKey)) || 0;
+  if (current >= RATE_LIMIT_MAX) return true;
+  await env.SIGNUP_KV.put(windowKey, String(current + 1), { expirationTtl: RATE_LIMIT_WINDOW_SEC * 2 });
+  return false;
+}
+
+/* ---------- confirmation email via Resend's HTTP API ----------
+   Swap this one function for any other provider (SendGrid, Mailgun, Postmark, ...) — nothing else
+   in the file needs to change. */
+async function sendConfirmEmail(env, to, confirmUrl, spots) {
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: env.MAIL_FROM,
+      to,
+      subject: "🌈 Confirm your Rainbow Alerts signup",
+      html: `<p>Tap below to confirm Rainbow Alerts for <b>${spots}</b>:</p>` +
+            `<p><a href="${confirmUrl}" style="background:#0b4f6c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Confirm my alerts</a></p>` +
+            `<p style="color:#5d7280;font-size:.85rem">This link expires in an hour. If you didn't request this, ignore it — nothing happens unless you click it.</p>`,
+    }),
+  });
+  if (!r.ok) { const detail = await r.text().catch(() => ""); throw new Error(`Resend ${r.status}: ${detail.slice(0, 200)}`); }
+}
 
 async function twilioSend(env, to, body) {
   const url = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`;

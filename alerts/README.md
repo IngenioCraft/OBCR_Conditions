@@ -57,6 +57,26 @@ Use any SMTP server. For a personal Gmail: turn on 2-step verification, create a
 Secrets: `SMTP_HOST` (e.g. `smtp.gmail.com`), `SMTP_PORT` (`587`), `SMTP_USER`
 (your address), `SMTP_PASS` (app password), `SMTP_FROM` (usually same as user).
 
+This is what **delivers** rainbow alerts by email (the Node watcher, via nodemailer). A separate,
+smaller piece of email sending — the signup confirm link below — runs **in the signup Worker**,
+which can't use nodemailer (it's not Node), so it needs its own setup.
+
+### 🔒 Email signup confirmation + flood rate limit (recommended, one KV binding covers both)
+Without this, `signup-worker.js` still works exactly as before — these are both opt-in. With it:
+a plain email signup no longer writes to the subscriber list immediately; it emails the person a
+confirm link first (so someone can't sign a stranger's inbox up for texts they never agreed to),
+and a flood of repeat signup POSTs from one IP gets capped instead of growing the store forever.
+1. Cloudflare dashboard → Storage & Databases → KV → create a namespace (e.g. `signup-kv`).
+2. Signup Worker → Settings → Bindings → add KV binding named **SIGNUP_KV** → that namespace.
+3. Create a free account at [resend.com](https://resend.com) (or any HTTP email API — see the
+   `sendConfirmEmail()` comment in `signup-worker.js` for where to swap it), verify a sending domain,
+   and add secrets: `RESEND_API_KEY`, `MAIL_FROM` (e.g. `Rainbow Alerts <alerts@yourdomain>`).
+4. Send yourself one real test signup afterward — the magic-link flow hasn't been exercised against
+   a live Resend account yet, so confirm the email actually arrives and the link actually works.
+
+Telegram already verifies ownership on its own (you have to message the bot from your own account),
+so it's unaffected. SMS/push aren't gated behind a confirm step yet.
+
 ### 🔔 Web push (free)
 1. Generate a key pair: `npx web-push generate-vapid-keys`.
 2. Put the **public** key in `signup.html` (`VAPID_PUBLIC_KEY`) — that unhides the option.
